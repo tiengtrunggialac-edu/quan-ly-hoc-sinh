@@ -657,20 +657,19 @@ function delResource(id){
 }
 
 function openImportScores(){
-  modalTitle.textContent="Nhập kết quả đánh giá";
+  modalTitle.textContent="⬆ Tải kết quả điểm";
   modalContent.innerHTML=`<div class="notice">
-    <b>Cách 1 – Excel / CSV:</b> Bảng nên có cột <b>Mã HS</b> hoặc <b>Họ và tên</b>. Các cột còn lại là tên tiêu chí và điểm 0–10.<br>
-    Ví dụ: <b>Mã HS | Họ và tên | Pinyin | Từ vựng | Nghe | Nói</b>
+    <b>Excel / CSV:</b> Tải file có cột <b>Mã HS</b> hoặc <b>Họ và tên</b>; các cột điểm sẽ tự thành tiêu chí.
   </div><br>
-  <label>Chọn file Excel / CSV</label>
-  <input id="scoreFile" type="file" accept=".xlsx,.xls,.csv" style="margin-top:8px">
+  <label>📁 Chọn file Excel / CSV</label>
+  <input id="scoreFile" type="file" accept=".xlsx,.xls,.csv" style="margin-top:8px;width:100%">
   <br><br>
-  <button type="button" class="btn primary" onclick="importScoreFile()">Tải kết quả từ file</button>
+  <button type="button" class="btn primary" onclick="importScoreFile()">⬆ Tải file và nhập điểm</button>
   <hr style="margin:20px 0;border:0;border-top:1px solid var(--line)">
-  <b>Cách 2 – Google Sheets</b>
-  <p class="hint">Dán <b>link CSV công khai</b> của Google Sheets vào ô dưới đây.</p>
-  <input id="sheetCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv">
-  <br><br><button type="button" class="btn outline" onclick="importGoogleSheet()">Tải từ Google Sheets</button>`;
+  <b>🔗 Google Sheets</b>
+  <p class="hint">Dán link chia sẻ của Google Sheets. Bảng cần cho phép xem bằng link.</p>
+  <input id="sheetCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%">
+  <br><br><button type="button" class="btn outline" onclick="importGoogleSheet()">🔗 Tải từ Google Sheets</button>`;
   modal.classList.add("show");
 }
 function findStudentFromImport(row){
@@ -729,20 +728,32 @@ async function importScoreFile(){
   }catch(err){console.error(err);alert("Không nhập được kết quả.\n\n"+err.message)}
 }
 async function importGoogleSheet(){
-  const url=document.getElementById("sheetCsvUrl").value.trim();
+  let url=document.getElementById("sheetCsvUrl").value.trim();
   if(!url)return alert("Vui lòng dán link Google Sheets.");
-  if(!/^https:\/\/docs\.google\.com\/spreadsheets\//i.test(url))return alert("Vui lòng dùng link Google Sheets.");
+  if(!/^https:\/\/docs\.google\.com\/spreadsheets\//i.test(url))
+    return alert("Đây không phải link Google Sheets.");
   try{
+    // Convert common /edit or /view share links to CSV export.
+    const m=url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if(m){
+      const gid=(url.match(/[?#&]gid=([0-9]+)/)||[])[1];
+      url=`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv${gid?`&gid=${gid}`:""}`;
+    }
     const res=await fetch(url);
-    if(!res.ok)throw new Error("Google Sheets không cho phép truy cập. Hãy đặt bảng ở chế độ có thể xem bằng link và dùng link CSV.");
+    if(!res.ok)throw new Error("Google Sheets không cho phép tải dữ liệu. Hãy bật chia sẻ 'Bất kỳ ai có liên kết - Người xem'.");
     const text=await res.text();
+    if(text.trim().startsWith("<"))throw new Error("Google Sheets đang yêu cầu đăng nhập hoặc chưa bật quyền xem bằng liên kết.");
+    if(typeof XLSX==="undefined")throw new Error("Không tải được thư viện Excel.");
     const wb=XLSX.read(text,{type:"string"});
     const ws=wb.Sheets[wb.SheetNames[0]];
     const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
     const r=applyImportedRows(rows);
     closeModal();
-    alert(`Đã nhập ${r.updated} kết quả từ Google Sheets. Tạo thêm ${r.createdCriteria} tiêu chí mới. Bỏ qua ${r.skipped} dòng không khớp học sinh.`);
-  }catch(err){console.error(err);alert("Không nhập được Google Sheets.\n\n"+err.message)}
+    alert(`Đã nhập ${r.updated} kết quả từ Google Sheets. Tạo ${r.createdCriteria} tiêu chí mới; bỏ qua ${r.skipped} dòng không khớp.`);
+  }catch(err){
+    console.error(err);
+    alert("Không nhập được Google Sheets.\n\n"+err.message);
+  }
 }
 function recordFee(id){
   const s=data.students.find(x=>String(x.id)===String(id));
@@ -768,11 +779,104 @@ function saveFee(id){
   persist();
 }
 function quickAction(a){if(a==="student")openStudent();else if(a==="course")openCourse();else if(a==="attendance")show("attendance");else if(a==="score")openScore();else if(a==="finance")show("finance");else if(a==="evaluation")show("evaluation")}
-function settingsTab(tab,btn){document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));btn.classList.add("active");let box=settingsContent;if(tab==="center")box.innerHTML=`<div class="panel"><h2>Thông tin trung tâm</h2><div class="formgrid"><div><label>Tên hiển thị</label><input id="set_name" value="${esc(data.center.name)}"></div><div><label>Dòng mô tả</label><input id="set_tag" value="${esc(data.center.tag)}"></div><div><label>Tiêu đề trang chính</label><input id="set_welcome" value="${esc(data.center.welcome)}"></div></div><br><label>Mô tả dưới tiêu đề</label><input id="set_sub" value="${esc(data.center.welcomeSub)}"><br><br><button class="btn primary" onclick="saveCenter()">Lưu thay đổi</button></div><div class="panel"><h2>Logo</h2><img class="logo-preview" src="${LOGO}"><p class="hint">Logo hiện tại được tích hợp trong file web.</p></div>`;
-else if(tab==="stats")box.innerHTML=`<div class="panel"><h2>4 thẻ thống kê</h2>${data.stats.map((s,i)=>`<div class="item-card" style="margin-bottom:10px"><div class="formgrid"><div><label>Tiêu đề ${i+1}</label><input id="sl${i}" value="${esc(s.label)}"></div><div><label>Dòng mô tả</label><input id="sh${i}" value="${esc(s.hint)}"></div></div></div>`).join("")}<button class="btn primary" onclick="saveStats()">Lưu thay đổi</button></div>`;
-else if(tab==="nav")box.innerHTML=`<div class="panel"><h2>Menu bên trái</h2>${data.nav.map((n,i)=>`<div class="item-card" style="margin-bottom:9px"><div class="formgrid"><div><label>Tên mục</label><input id="nl${i}" value="${esc(n.label)}"></div><div><label>Biểu tượng</label><input id="ni${i}" value="${esc(n.icon)}"></div></div></div>`).join("")}<button class="btn primary" onclick="saveNav()">Lưu thay đổi</button></div>`;
-else if(tab==="quick")box.innerHTML=`<div class="panel"><h2>Công cụ nhanh</h2>${data.quick.map((q,i)=>`<div class="item-card" style="margin-bottom:9px"><div class="formgrid"><div><label>Tên nút</label><input id="ql${i}" value="${esc(q.label)}"></div><div><label>Biểu tượng</label><input id="qi${i}" value="${esc(q.icon)}"></div></div></div>`).join("")}<button class="btn primary" onclick="saveQuick()">Lưu thay đổi</button></div>`;
-else box.innerHTML=`<div class="panel"><h2>Sao lưu & khôi phục</h2><p class="notice">Tất cả thay đổi được lưu tự động trên trình duyệt. Bạn nên xuất bản sao định kỳ.</p><button class="btn primary" onclick="backup()">⬇ Xuất dữ liệu</button> <label class="btn outline" style="display:inline-block;cursor:pointer">⬆ Nhập dữ liệu<input type="file" accept=".json" onchange="restore(event)" style="display:none"></label><button class="btn danger" onclick="resetData()">Khôi phục cài đặt ban đầu</button></div>`}
+function settingsTab(tab,btn){
+  document.querySelectorAll("#settings .tabs button").forEach(b=>b.classList.remove("active"));
+  if(btn)btn.classList.add("active");
+  const box=document.getElementById("settingsContent");
+  if(!box)return;
+
+  if(tab==="center"){
+    box.innerHTML=`<div class="panel"><h2>🏫 Thông tin trung tâm</h2>
+      <div class="formgrid two">
+        <div><label>Tên trung tâm</label><input id="set_center_name" value="${esc(data.settings?.centerName||"GIA LẠC")}"></div>
+        <div><label>Địa chỉ</label><input id="set_center_address" value="${esc(data.settings?.address||"")}"></div>
+        <div><label>Số điện thoại</label><input id="set_center_phone" value="${esc(data.settings?.phone||"")}"></div>
+        <div><label>Email</label><input id="set_center_email" value="${esc(data.settings?.email||"")}"></div>
+      </div><br>
+      <button type="button" class="btn primary" onclick="saveCenterSettings()">Lưu thông tin</button>
+    </div>`;
+  }else if(tab==="stats"){
+    box.innerHTML=`<div class="panel"><h2>📊 Thẻ thống kê</h2>
+      <p class="hint">Các thẻ thống kê sẽ sử dụng dữ liệu học sinh, khóa học và học phí hiện tại.</p>
+      <label><input id="set_show_stats" type="checkbox" ${data.settings?.showStats!==false?"checked":""}> Hiển thị thẻ thống kê</label><br><br>
+      <button type="button" class="btn primary" onclick="saveStatsSettings()">Lưu</button>
+    </div>`;
+  }else if(tab==="nav"){
+    box.innerHTML=`<div class="panel"><h2>🧭 Menu</h2>
+      <p class="hint">Bật/tắt các mục trên menu. Dữ liệu vẫn được giữ nguyên.</p>
+      <div class="formgrid two">
+        ${[
+          ["students","Học sinh"],["courses","Khóa học"],["evaluation","Đánh giá"],
+          ["schedule","Lịch học"],["library","Thư viện"],["finance","Học phí"]
+        ].map(([id,label])=>`<label><input id="nav_${id}" type="checkbox" ${data.settings?.nav?.[id]!==false?"checked":""}> ${label}</label>`).join("")}
+      </div><br><button type="button" class="btn primary" onclick="saveNavSettings()">Lưu menu</button>
+    </div>`;
+  }else if(tab==="quick"){
+    box.innerHTML=`<div class="panel"><h2>⚡ Công cụ nhanh</h2>
+      <div class="actions">
+        <button type="button" class="btn primary" onclick="openStudent()">＋ Thêm học sinh</button>
+        <button type="button" class="btn outline" onclick="openCourse()">＋ Thêm khóa học</button>
+        <button type="button" class="btn outline" onclick="openScore()">＋ Nhập điểm</button>
+        <button type="button" class="btn outline" onclick="openImportScores()">⬆ Nhập Excel / Google Sheets</button>
+      </div>
+    </div>`;
+  }else if(tab==="data"){
+    box.innerHTML=`<div class="panel"><h2>💾 Dữ liệu</h2>
+      <p class="hint">Sao lưu dữ liệu hiện tại hoặc khôi phục từ file JSON đã xuất.</p>
+      <div class="actions">
+        <button type="button" class="btn primary" onclick="backup()">⬇ Xuất bản sao</button>
+        <button type="button" class="btn outline" onclick="document.getElementById('restoreDataFile').click()">⬆ Khôi phục dữ liệu</button>
+        <input id="restoreDataFile" type="file" accept=".json" style="display:none" onchange="restoreData(event)">
+      </div>
+    </div>`;
+  }
+}
+function saveCenterSettings(){
+  data.settings=data.settings||{};
+  data.settings.centerName=document.getElementById("set_center_name").value.trim();
+  data.settings.address=document.getElementById("set_center_address").value.trim();
+  data.settings.phone=document.getElementById("set_center_phone").value.trim();
+  data.settings.email=document.getElementById("set_center_email").value.trim();
+  persist(); alert("Đã lưu thông tin trung tâm.");
+}
+function saveStatsSettings(){
+  data.settings=data.settings||{};
+  data.settings.showStats=document.getElementById("set_show_stats").checked;
+  persist(); alert("Đã lưu cài đặt.");
+}
+function saveNavSettings(){
+  data.settings=data.settings||{}; data.settings.nav=data.settings.nav||{};
+  ["students","courses","evaluation","schedule","library","finance"].forEach(id=>{
+    data.settings.nav[id]=document.getElementById("nav_"+id).checked;
+  });
+  persist(); applyNavSettings(); alert("Đã lưu menu.");
+}
+function applyNavSettings(){
+  const nav=data.settings?.nav||{};
+  Object.keys(nav).forEach(id=>{
+    const page=document.getElementById(id);
+    const item=document.querySelector(`[data-page="${id}"]`);
+    if(page)page.style.display=nav[id]===false?"none":"";
+    if(item)item.style.display=nav[id]===false?"none":"";
+  });
+}
+function restoreData(event){
+  const file=event.target.files?.[0]; if(!file)return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const obj=JSON.parse(fr.result);
+      if(!obj || typeof obj!=="object")throw new Error("File dữ liệu không hợp lệ.");
+      if(!confirm("Khôi phục dữ liệu sẽ thay thế dữ liệu hiện tại. Tiếp tục?"))return;
+      data=obj;
+      data.settings=data.settings||{};
+      persist(); renderAll(); applyNavSettings();
+      alert("Đã khôi phục dữ liệu.");
+    }catch(err){alert("Không thể khôi phục: "+err.message)}
+  };
+  fr.readAsText(file);
+}
+
 function saveCenter(){Object.assign(data.center,{name:set_name.value,tag:set_tag.value,welcome:set_welcome.value,welcomeSub:set_sub.value});persist();settingsTab("center",document.querySelector(".tabs button"))}
 function saveStats(){data.stats.forEach((s,i)=>{s.label=document.getElementById("sl"+i).value;s.hint=document.getElementById("sh"+i).value});persist()}
 function saveNav(){data.nav.forEach((n,i)=>{n.label=document.getElementById("nl"+i).value;n.icon=document.getElementById("ni"+i).value});persist()}
