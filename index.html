@@ -340,6 +340,7 @@ data.courses=Array.isArray(data.courses)?data.courses:JSON.parse(JSON.stringify(
 data.schedules=Array.isArray(data.schedules)?data.schedules:[];
 data.resources=Array.isArray(data.resources)?data.resources:[];
 data.notices=Array.isArray(data.notices)?data.notices:[];
+data.settings=data.settings&&typeof data.settings==="object"?data.settings:{};
 function persist(){localStorage.setItem("gialac_manager",JSON.stringify(data));renderAll()}
 function saveLocal(){localStorage.setItem("gialac_manager",JSON.stringify(data))}
 async function loadSupabaseData(){
@@ -361,6 +362,7 @@ async function loadSupabaseData(){
   }));
   saveLocal();
   renderAll();
+try{settingsTab("center",document.querySelector("#settings .tabs button"));}catch(e){console.warn(e)}
   console.log("GiaLac: đã tải dữ liệu từ Supabase",{courses:data.courses.length,students:data.students.length});
  }catch(err){
   console.error("GiaLac Supabase error:",err);
@@ -788,77 +790,89 @@ function settingsTab(tab,btn){
   if(tab==="center"){
     box.innerHTML=`<div class="panel"><h2>🏫 Thông tin trung tâm</h2>
       <div class="formgrid two">
-        <div><label>Tên trung tâm</label><input id="set_center_name" value="${esc(data.settings?.centerName||"GIA LẠC")}"></div>
-        <div><label>Địa chỉ</label><input id="set_center_address" value="${esc(data.settings?.address||"")}"></div>
-        <div><label>Số điện thoại</label><input id="set_center_phone" value="${esc(data.settings?.phone||"")}"></div>
-        <div><label>Email</label><input id="set_center_email" value="${esc(data.settings?.email||"")}"></div>
+        <div><label>Tên trung tâm</label><input id="set_center_name" value="${esc(data.center?.name||"GIA LẠC")}"></div>
+        <div><label>Slogan</label><input id="set_center_tag" value="${esc(data.center?.tag||"")}"></div>
+        <div><label>Lời chào trang chủ</label><input id="set_center_welcome" value="${esc(data.center?.welcome||"")}"></div>
+        <div><label>Mô tả lời chào</label><input id="set_center_welcomeSub" value="${esc(data.center?.welcomeSub||"")}"></div>
       </div><br>
-      <button type="button" class="btn primary" onclick="saveCenterSettings()">Lưu thông tin</button>
+      <button type="button" class="btn primary" onclick="saveCenterSettings()">💾 Lưu thay đổi</button>
     </div>`;
   }else if(tab==="stats"){
     box.innerHTML=`<div class="panel"><h2>📊 Thẻ thống kê</h2>
-      <p class="hint">Các thẻ thống kê sẽ sử dụng dữ liệu học sinh, khóa học và học phí hiện tại.</p>
-      <label><input id="set_show_stats" type="checkbox" ${data.settings?.showStats!==false?"checked":""}> Hiển thị thẻ thống kê</label><br><br>
-      <button type="button" class="btn primary" onclick="saveStatsSettings()">Lưu</button>
+      ${data.stats.map((x,i)=>`<div class="formgrid two" style="margin-bottom:10px">
+        <div><label>Tên thẻ ${i+1}</label><input id="set_stat_label_${i}" value="${esc(x.label||"")}"></div>
+        <div><label>Mô tả ${i+1}</label><input id="set_stat_hint_${i}" value="${esc(x.hint||"")}"></div>
+      </div>`).join("")}
+      <button type="button" class="btn primary" onclick="saveStatsSettings()">💾 Lưu thay đổi</button>
     </div>`;
   }else if(tab==="nav"){
     box.innerHTML=`<div class="panel"><h2>🧭 Menu</h2>
-      <p class="hint">Bật/tắt các mục trên menu. Dữ liệu vẫn được giữ nguyên.</p>
-      <div class="formgrid two">
-        ${[
-          ["students","Học sinh"],["courses","Khóa học"],["evaluation","Đánh giá"],
-          ["schedule","Lịch học"],["library","Thư viện"],["finance","Học phí"]
-        ].map(([id,label])=>`<label><input id="nav_${id}" type="checkbox" ${data.settings?.nav?.[id]!==false?"checked":""}> ${label}</label>`).join("")}
-      </div><br><button type="button" class="btn primary" onclick="saveNavSettings()">Lưu menu</button>
+      <p class="hint">Bạn có thể đổi tên và biểu tượng từng mục. Các thay đổi sẽ được lưu vào trình duyệt.</p>
+      ${data.nav.map((x,i)=>`<div class="formgrid two" style="margin-bottom:10px">
+        <div><label>Tên menu ${i+1}</label><input id="set_nav_label_${i}" value="${esc(x.label||"")}"></div>
+        <div><label>Biểu tượng</label><input id="set_nav_icon_${i}" value="${esc(x.icon||"")}"></div>
+      </div>`).join("")}
+      <button type="button" class="btn primary" onclick="saveNavSettings()">💾 Lưu thay đổi</button>
     </div>`;
   }else if(tab==="quick"){
     box.innerHTML=`<div class="panel"><h2>⚡ Công cụ nhanh</h2>
-      <div class="actions">
-        <button type="button" class="btn primary" onclick="openStudent()">＋ Thêm học sinh</button>
-        <button type="button" class="btn outline" onclick="openCourse()">＋ Thêm khóa học</button>
-        <button type="button" class="btn outline" onclick="openScore()">＋ Nhập điểm</button>
-        <button type="button" class="btn outline" onclick="openImportScores()">⬆ Nhập Excel / Google Sheets</button>
-      </div>
+      ${data.quick.map((x,i)=>`<div class="formgrid two" style="margin-bottom:10px">
+        <div><label>Tên nút ${i+1}</label><input id="set_quick_label_${i}" value="${esc(x.label||"")}"></div>
+        <div><label>Biểu tượng</label><input id="set_quick_icon_${i}" value="${esc(x.icon||"")}"></div>
+      </div>`).join("")}
+      <button type="button" class="btn primary" onclick="saveQuickSettings()">💾 Lưu thay đổi</button>
     </div>`;
   }else if(tab==="data"){
     box.innerHTML=`<div class="panel"><h2>💾 Dữ liệu</h2>
-      <p class="hint">Sao lưu dữ liệu hiện tại hoặc khôi phục từ file JSON đã xuất.</p>
+      <p class="hint">Sao lưu toàn bộ dữ liệu hiện tại hoặc khôi phục từ file JSON.</p>
       <div class="actions">
         <button type="button" class="btn primary" onclick="backup()">⬇ Xuất bản sao</button>
         <button type="button" class="btn outline" onclick="document.getElementById('restoreDataFile').click()">⬆ Khôi phục dữ liệu</button>
+        <button type="button" class="btn danger" onclick="resetData()">↺ Khôi phục mặc định</button>
         <input id="restoreDataFile" type="file" accept=".json" style="display:none" onchange="restoreData(event)">
       </div>
     </div>`;
   }
 }
 function saveCenterSettings(){
-  data.settings=data.settings||{};
-  data.settings.centerName=document.getElementById("set_center_name").value.trim();
-  data.settings.address=document.getElementById("set_center_address").value.trim();
-  data.settings.phone=document.getElementById("set_center_phone").value.trim();
-  data.settings.email=document.getElementById("set_center_email").value.trim();
-  persist(); alert("Đã lưu thông tin trung tâm.");
+  data.center=data.center||{};
+  data.center.name=document.getElementById("set_center_name").value.trim()||"GIA LẠC";
+  data.center.tag=document.getElementById("set_center_tag").value.trim();
+  data.center.welcome=document.getElementById("set_center_welcome").value.trim();
+  data.center.welcomeSub=document.getElementById("set_center_welcomeSub").value.trim();
+  persist();
+  alert("Đã lưu thay đổi thông tin trung tâm.");
 }
 function saveStatsSettings(){
-  data.settings=data.settings||{};
-  data.settings.showStats=document.getElementById("set_show_stats").checked;
-  persist(); alert("Đã lưu cài đặt.");
+  data.stats=Array.isArray(data.stats)?data.stats:[];
+  data.stats.forEach((x,i)=>{
+    x.label=document.getElementById("set_stat_label_"+i).value.trim();
+    x.hint=document.getElementById("set_stat_hint_"+i).value.trim();
+  });
+  persist();
+  alert("Đã lưu thay đổi thẻ thống kê.");
 }
 function saveNavSettings(){
-  data.settings=data.settings||{}; data.settings.nav=data.settings.nav||{};
-  ["students","courses","evaluation","schedule","library","finance"].forEach(id=>{
-    data.settings.nav[id]=document.getElementById("nav_"+id).checked;
+  data.nav=Array.isArray(data.nav)?data.nav:[];
+  data.nav.forEach((x,i)=>{
+    x.label=document.getElementById("set_nav_label_"+i).value.trim();
+    x.icon=document.getElementById("set_nav_icon_"+i).value.trim();
   });
-  persist(); applyNavSettings(); alert("Đã lưu menu.");
+  persist();
+  alert("Đã lưu thay đổi menu.");
+}
+function saveQuickSettings(){
+  data.quick=Array.isArray(data.quick)?data.quick:[];
+  data.quick.forEach((x,i)=>{
+    x.label=document.getElementById("set_quick_label_"+i).value.trim();
+    x.icon=document.getElementById("set_quick_icon_"+i).value.trim();
+  });
+  persist();
+  alert("Đã lưu thay đổi công cụ nhanh.");
 }
 function applyNavSettings(){
-  const nav=data.settings?.nav||{};
-  Object.keys(nav).forEach(id=>{
-    const page=document.getElementById(id);
-    const item=document.querySelector(`[data-page="${id}"]`);
-    if(page)page.style.display=nav[id]===false?"none":"";
-    if(item)item.style.display=nav[id]===false?"none":"";
-  });
+  // Menu is controlled by data.nav; re-rendering it is enough.
+  navRender();
 }
 function restoreData(event){
   const file=event.target.files?.[0]; if(!file)return;
@@ -866,21 +880,26 @@ function restoreData(event){
   fr.onload=()=>{
     try{
       const obj=JSON.parse(fr.result);
-      if(!obj || typeof obj!=="object")throw new Error("File dữ liệu không hợp lệ.");
+      if(!obj||typeof obj!=="object")throw new Error("File dữ liệu không hợp lệ.");
       if(!confirm("Khôi phục dữ liệu sẽ thay thế dữ liệu hiện tại. Tiếp tục?"))return;
       data=obj;
-      data.settings=data.settings||{};
-      persist(); renderAll(); applyNavSettings();
+      data.center=data.center||{};
+      data.stats=Array.isArray(data.stats)?data.stats:[];
+      data.nav=Array.isArray(data.nav)?data.nav:[];
+      data.quick=Array.isArray(data.quick)?data.quick:[];
+      data.criteria=Array.isArray(data.criteria)?data.criteria:[];
+      data.students=Array.isArray(data.students)?data.students:[];
+      data.courses=Array.isArray(data.courses)?data.courses:[];
+      data.schedules=Array.isArray(data.schedules)?data.schedules:[];
+      data.resources=Array.isArray(data.resources)?data.resources:[];
+      data.notices=Array.isArray(data.notices)?data.notices:[];
+      persist();
       alert("Đã khôi phục dữ liệu.");
     }catch(err){alert("Không thể khôi phục: "+err.message)}
   };
   fr.readAsText(file);
 }
 
-function saveCenter(){Object.assign(data.center,{name:set_name.value,tag:set_tag.value,welcome:set_welcome.value,welcomeSub:set_sub.value});persist();settingsTab("center",document.querySelector(".tabs button"))}
-function saveStats(){data.stats.forEach((s,i)=>{s.label=document.getElementById("sl"+i).value;s.hint=document.getElementById("sh"+i).value});persist()}
-function saveNav(){data.nav.forEach((n,i)=>{n.label=document.getElementById("nl"+i).value;n.icon=document.getElementById("ni"+i).value});persist()}
-function saveQuick(){data.quick.forEach((q,i)=>{q.label=document.getElementById("ql"+i).value;q.icon=document.getElementById("qi"+i).value});persist()}
 function backup(){let b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="GiaLac_backup.json";a.click()}
 function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);persist();alert("Đã khôi phục dữ liệu.")}catch{alert("File dữ liệu không hợp lệ.")}};r.readAsText(f)}
 function resetData(){if(confirm("Xóa toàn bộ dữ liệu hiện tại và khôi phục mặc định?")){data=JSON.parse(JSON.stringify(defaultData));persist()}}
