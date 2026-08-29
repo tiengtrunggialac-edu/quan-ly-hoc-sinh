@@ -78,7 +78,21 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1
   /* Chi phí phát sinh được nhập trực tiếp trong Ghi nhận học phí */
   .standalone-additional-fee-button { display:none !important; }
 </style>
-</head>
+
+<style id="fee-report-final-style">
+.fee .fee-row.grand-total{
+  margin:4px -12px 0;padding:9px 12px;
+  border:1px solid #b9d8cf;border-radius:9px;
+  background:#f1f9f6;font-size:14px;color:#176d60;
+}
+.fee .fee-row.grand-total strong:last-child{font-size:15px}
+</style>
+<style id="login-click-fix">
+.login-screen{pointer-events:auto !important;z-index:99999 !important;}
+.login-screen.show{pointer-events:auto !important;}
+.login-card{position:relative;z-index:100000;pointer-events:auto !important;}
+#loginBtn,#signupBtn{position:relative;z-index:100001;pointer-events:auto !important;cursor:pointer;}
+</style></head>
 <body>
 
 <div class="login-screen show" id="loginScreen">
@@ -159,11 +173,11 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1
  </div>
 </section>
 
-<section id="students" class="page"><div class="top"><div><h1>Học sinh</h1><p>Hồ sơ, tiến độ và thông tin cá nhân</p></div><button class="btn primary" onclick="openStudent()">＋ Thêm học sinh</button></div><div class="panel"><div class="toolbar"><b>Danh sách học sinh</b><input id="studentSearch" class="search" placeholder="🔎 Tìm theo tên, mã..." oninput="renderStudents()"></div><div id="studentTable"></div></div></section>
+<section id="students" class="page"><div class="top"><div><h1>Học sinh</h1><p>Hồ sơ, tiến độ và thông tin cá nhân</p></div><div class="actions"><button class="btn primary" onclick="openStudent()">＋ Thêm học sinh</button></div></div><div class="panel"><div class="toolbar"><b>Danh sách học sinh</b><input id="studentSearch" class="search" placeholder="🔎 Tìm theo tên, mã..." oninput="renderStudents()"></div><div id="studentTable"></div></div></section>
 
 <section id="courses" class="page"><div class="top"><div><h1>Khóa học</h1><p>Tự chỉnh sửa tên lớp, học phí và mô tả</p></div><button class="btn primary" onclick="openCourse()">＋ Thêm khóa học</button></div><div class="panel"><div id="courseTable"></div></div></section>
 
-<section id="attendance" class="page"><div class="top"><div><h1>Điểm danh</h1><p>Điểm danh theo lớp và từng ngày học</p></div></div><div class="panel"><div id="attClassPanel"></div></div><div class="panel"><h2>Lịch sử chuyên cần</h2><div id="attTable"></div></div></section>
+<section id="attendance" class="page"><div class="top"><div><h1>Điểm danh</h1><p>Điểm danh theo lớp và từng ngày học</p></div><div class="actions"><button type="button" class="btn outline" onclick="calculateClassSessions()">🔢 Tính số buổi lớp</button></div></div><div class="panel"><div id="attClassPanel"></div></div><div class="panel"><h2>Lịch sử chuyên cần</h2><div id="attTable"></div></div></section>
 
 <section id="schedule" class="page"><div class="top"><div><h1>Lịch học</h1><p>Tự thêm, sửa, xóa lịch lớp</p></div><button class="btn primary" onclick="openSchedule()">＋ Thêm lịch</button></div><div class="panel"><div id="scheduleTable"></div></div></section>
 
@@ -194,7 +208,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1
     <div id="remarksHistory"></div>
   </div>
 </section>
-<section id="finance" class="page"><div class="top"><div><h1>Học phí</h1><p>Quản lý khoản phải thu và đã thanh toán</p><button type="button" class="btn primary" onclick="openTuitionCalculator()">🧮 Tính học phí</button><div class="actions"><button type="button" class="btn outline" onclick="openParentReportPicker()">🧾 Xuất hóa đơn + báo cáo</button></div></div></div><div class="panel"><div id="financeTable"></div></div></section>
+<section id="finance" class="page"><div class="top"><div><h1>Học phí</h1><p>Quản lý khoản phải thu và đã thanh toán</p><button type="button" class="btn primary" onclick="openTuitionCalculator()">🧮 Tính học phí</button><div class="actions"><button type="button" class="btn outline" onclick="openParentReportPicker()">🧾 Xuất phiếu thu học phí</button></div></div></div><div class="panel"><div id="financeTable"></div></div></section>
 
 <section id="library" class="page">
 <div class="top"><div><h1>Thư viện</h1><p>Tài liệu và liên kết của trung tâm</p></div>
@@ -304,11 +318,16 @@ async function signup(){
     btn.disabled=false;btn.textContent="Tạo tài khoản";
   }
 }
-document.getElementById("loginPassword")?.addEventListener("keydown",e=>{if(e.key==="Enter")login();});
-document.getElementById("loginEmail")?.addEventListener("keydown",e=>{if(e.key==="Enter")login();});
+document.getElementById("loginPassword")?.addEventListener("keydown",e=>{if(e.key==="Enter")login(e);});
+document.getElementById("loginEmail")?.addEventListener("keydown",e=>{if(e.key==="Enter")login(e);});
+document.getElementById("loginBtn")?.addEventListener("click",e=>{e.preventDefault();login(e);});
 
 async function initAuth(){
   const loginScreen=document.getElementById("loginScreen");
+  if(!supabaseClient){
+    showLogin("Không tải được hệ thống đăng nhập. Vui lòng kiểm tra mạng rồi tải lại trang.");
+    return;
+  }
   const signupScreen=document.getElementById("signupScreen");
   const logo=document.getElementById("loginLogo");
   const signupLogo=document.getElementById("signupLogo");
@@ -385,8 +404,8 @@ const defaultData={
   {id:"read",name:"Đọc",weight:1},
   {id:"write",name:"Viết",weight:1}],
  students:[],courses:[
-  {id:1,name:"HSK 1 – Nền tảng",teacher:"",fee:1200000,desc:"Khóa học nền tảng"},
-  {id:2,name:"HSK 2 – Sơ cấp",teacher:"",fee:1500000,desc:"Khóa học sơ cấp"}],
+  {id:1,name:"HSK 1 – Nền tảng",teacher:"",fee:1200000,fee_mode:"course",fee_per_session:0,course_start_date:"",course_end_date:"",course_sessions:0,desc:"Khóa học nền tảng"},
+  {id:2,name:"HSK 2 – Sơ cấp",teacher:"",fee:1500000,fee_mode:"course",fee_per_session:0,course_start_date:"",course_end_date:"",course_sessions:0,desc:"Khóa học sơ cấp"}],
  schedules:[],resources:[],notices:[]
 };
 let data;
@@ -402,10 +421,14 @@ data.quick=Array.isArray(data.quick)?data.quick:JSON.parse(JSON.stringify(defaul
 data.criteria=Array.isArray(data.criteria)?data.criteria:JSON.parse(JSON.stringify(defaultData.criteria));
 data.students=Array.isArray(data.students)?data.students:[];
 data.courses=Array.isArray(data.courses)?data.courses:JSON.parse(JSON.stringify(defaultData.courses));
+data.courses.forEach(c=>{c.fee_mode=c.fee_mode||"course";c.fee_per_session=Number(c.fee_per_session||0)||0;c.course_start_date=c.course_start_date||"";c.course_end_date=c.course_end_date||"";c.course_sessions=Number(c.course_sessions||0)||0;});
 data.schedules=Array.isArray(data.schedules)?data.schedules:[];
 data.resources=Array.isArray(data.resources)?data.resources:[];
 data.notices=Array.isArray(data.notices)?data.notices:[];
 data.settings=data.settings&&typeof data.settings==="object"?data.settings:{};
+data.attendanceSheetUrl=typeof data.attendanceSheetUrl==="string"?data.attendanceSheetUrl:"";
+data.attendanceSheetTitle=typeof data.attendanceSheetTitle==="string"?data.attendanceSheetTitle:""; data.attendanceSheetMetaByMonth=(data.attendanceSheetMetaByMonth&&typeof data.attendanceSheetMetaByMonth==="object")?data.attendanceSheetMetaByMonth:{};
+data.attendanceSource=data.attendanceSource||"manual"; data.studentSheetUrl=typeof data.studentSheetUrl==="string"?data.studentSheetUrl:""; data.studentSheetTitle=typeof data.studentSheetTitle==="string"?data.studentSheetTitle:""; data.studentSheetSource=data.studentSheetSource||"manual";
 function persist(){localStorage.setItem("gialac_manager",JSON.stringify(data));renderAll()}
 function saveLocal(){localStorage.setItem("gialac_manager",JSON.stringify(data))}
 async function loadSupabaseData(){
@@ -419,7 +442,11 @@ async function loadSupabaseData(){
   const courseRows=Array.isArray(courses)?courses:[];
   const studentRows=Array.isArray(students)?students:[];
   const courseMap=new Map(courseRows.map(c=>[c.id,c]));
-  data.courses=courseRows.map(c=>({id:c.id,name:c.name||"",teacher:c.teacher||"",fee:Number(c.fee)||0,desc:""}));
+  const localCourses=Array.isArray(data.courses)?data.courses:[];
+  data.courses=courseRows.map(c=>{
+    const lc=localCourses.find(x=>String(x.id)===String(c.id))||{};
+    return {id:c.id,name:c.name||"",teacher:c.teacher||"",fee:Number(c.fee)||0,desc:lc.desc||"",fee_mode:lc.fee_mode||"course",fee_per_session:Number(lc.fee_per_session??0)||0,course_start_date:lc.course_start_date||"",course_end_date:lc.course_end_date||"",course_sessions:Number(lc.course_sessions??0)||0};
+  });
   data.students=studentRows.map(s=>({
    id:s.id,name:s.name||"",code:s.student_code||"",course_id:s.course_id||null,
    course:courseMap.get(s.course_id)?.name||"",dob:s.date_of_birth||"",start:s.start_date||"",
@@ -460,9 +487,170 @@ function renderHome(){
  skillsHome.innerHTML=data.criteria.map(c=>{let a=[];data.students.forEach(s=>(s.scores?.[c.id]||[]).forEach(v=>a.push(+v)));let x=a.length?a.reduce((p,n)=>p+n,0)/a.length:null;return `<div class="skill"><div class="skillhead"><b>${esc(c.name)}</b><span>${x==null?"–":x.toFixed(1)}</span></div><div class="progress"><span style="width:${x?x*10:0}%"></span></div></div>`}).join("")||'<div class="empty">Chưa có tiêu chí.</div>';
  noticeHome.innerHTML=data.notices.length?data.notices.slice(-5).reverse().map(n=>`<div class="item-card" style="margin-bottom:8px"><b>${esc(n.title)}</b><br><small>${esc(n.text)}</small></div>`).join(""):'<div class="empty">Chưa có thông báo.</div>';
 }
+
+function googleSheetJsonp(url){
+  return new Promise((resolve,reject)=>{
+    const raw=String(url||"").trim();
+    const m=raw.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if(!m)return reject(new Error("Link Google Sheets không hợp lệ."));
+    const gid=(raw.match(/[?#&]gid=(\d+)/)||[])[1]||"0";
+    const cb="gialacGS_"+Date.now()+"_"+Math.floor(Math.random()*1000000);
+    const script=document.createElement("script");
+    let finished=false;
+    let timer=null;
+    const cleanup=()=>{
+      if(finished)return;
+      finished=true;
+      if(timer)clearTimeout(timer);
+      script.remove();
+      try{delete window[cb]}catch(e){window[cb]=undefined}
+    };
+    const fail=(msg)=>{cleanup();reject(new Error(msg));};
+    timer=setTimeout(()=>fail("Google Sheets không phản hồi. Hãy kiểm tra quyền chia sẻ của bảng."),15000);
+    window[cb]=(response)=>{
+      try{
+        if(!response)throw new Error("Google Sheets trả về dữ liệu rỗng.");
+        if(response.status==="error"){
+          const e=response.errors&&response.errors[0];
+          throw new Error(e?.detailed_message||e?.message||"Google Sheets từ chối truy cập.");
+        }
+        const table=response.table;
+        if(!table)throw new Error("Không đọc được cấu trúc dữ liệu Google Sheets.");
+        const headers=(table.cols||[]).map(c=>c?.label||c?.id||"");
+        const rows=(table.rows||[]).map(r=>(r.c||[]).map(c=>{
+          if(c==null)return "";
+          return c.f!=null?String(c.f):(c.v!=null?String(c.v):"");
+        }));
+        cleanup();
+        resolve({headers,rows});
+      }catch(e){fail(e?.message||String(e))}
+    };
+    script.onerror=()=>fail("Không thể kết nối tới Google Sheets. Hãy kiểm tra kết nối mạng.");
+    script.src="https://docs.google.com/spreadsheets/d/"+m[1]+
+      "/gviz/tq?tqx=responseHandler:"+encodeURIComponent(cb)+
+      "&gid="+encodeURIComponent(gid)+"&headers=1";
+    document.head.appendChild(script);
+  });
+}
+async function readGoogleSheet(url){
+  // Google Sheets không cho fetch() từ file HTML chạy trực tiếp trên máy do CORS.
+  // Ưu tiên JSONP để web HTML local vẫn đọc được bảng công khai/quyền xem.
+  return await googleSheetJsonp(url);
+}
+function parseStudentSheetUrl(url){
+  const m=String(url||"").match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if(!m)return null;
+  const gid=(String(url).match(/[?#&]gid=(\d+)/)||[])[1]||"0";
+  return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
+}
+function normalizeHeader(v){
+  return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").replace(/[^a-z0-9]+/g," ").trim();
+}
+function findCol(headers, aliases){
+  const hs=headers.map(normalizeHeader);
+  for(const a of aliases){
+    const n=normalizeHeader(a),i=hs.indexOf(n);
+    if(i>=0)return i;
+  }
+  for(let i=0;i<hs.length;i++){
+    if(aliases.some(a=>hs[i].includes(normalizeHeader(a))))return i;
+  }
+  return -1;
+}
+function openStudentSheet(){
+  modalTitle.textContent="🔗 Gắn Google Sheets danh sách học sinh";
+  modalContent.innerHTML=`<div class="notice">
+    <b>Hệ thống sẽ tự đọc danh sách học sinh từ Google Sheets.</b><br>
+    Khuyến nghị có các cột: <b>Tên tiếng Trung</b>, <b>Tên tiếng Việt</b>, <b>Lớp</b>, <b>Mã học sinh</b>, <b>Trạng thái</b>.<br>
+    Chỉ cần có <b>Tên tiếng Việt</b> và <b>Lớp</b> là hệ thống vẫn có thể nhận diện.
+    <br>Danh sách được đồng bộ vào mục <b>Học sinh</b>; học sinh không còn xuất hiện trên Sheet sẽ không tự bị xóa.
+  </div><br>
+  <label>🏷️ Tiêu đề</label>
+  <input id="studentSheetTitle" value="${esc(data.studentSheetTitle||"Danh sách học sinh Google Sheets")}" style="width:100%;margin-top:8px"><br><br>
+  <label>🔗 Link Google Sheets</label>
+  <input id="studentSheetUrl" type="url" value="${esc(data.studentSheetUrl||"")}" placeholder="Dán link Google Sheets..." style="width:100%;margin-top:8px"><br><br>
+  <button type="button" class="btn primary" onclick="saveStudentSheet()">💾 Lưu & cập nhật danh sách</button>
+  ${data.studentSheetUrl?` <button type="button" class="btn outline" onclick="syncStudentsFromGoogleSheet()">🔄 Cập nhật ngay</button>`:""}
+  `;
+  modal.classList.add("show");
+}
+function saveStudentSheet(){
+  const url=document.getElementById("studentSheetUrl")?.value.trim();
+  if(!parseStudentSheetUrl(url))return alert("Vui lòng nhập đúng link Google Sheets.");
+  data.studentSheetUrl=url;
+  data.studentSheetTitle=document.getElementById("studentSheetTitle")?.value.trim()||"Danh sách học sinh Google Sheets";
+  data.studentSheetSource="google";
+  persist();closeModal();
+  syncStudentsFromGoogleSheet();
+}
+async function syncStudentsFromGoogleSheet(){
+  const url=parseStudentSheetUrl(data.studentSheetUrl);
+  if(!url)return alert("Chưa có link Google Sheets danh sách học sinh.");
+  try{
+    const sheet=await readGoogleSheet(data.studentSheetUrl);
+    const headers=sheet.headers||[];
+    const rows=[headers,...(sheet.rows||[])];
+    if(rows.length<2)throw new Error("Bảng chưa có đủ dữ liệu.");
+    const vn=findCol(headers,["Tên tiếng Việt","Tên Việt Nam","Họ và tên","Học sinh","Student","Name"]);
+    const cn=findCol(headers,["Tên tiếng Trung","中文","Tên Trung","Chinese Name"]);
+    const cls=findCol(headers,["Lớp","Khóa học","Class","Course"]);
+    const code=findCol(headers,["Mã học sinh","Mã HS","Code","Student ID"]);
+    const status=findCol(headers,["Trạng thái","Status"]);
+    if(vn<0 && cn<0)throw new Error("Không tìm thấy cột Tên tiếng Việt hoặc Tên tiếng Trung.");
+    let updated=0,created=0,skipped=0;
+    const norm=x=>String(x||"").trim().toLowerCase();
+    for(let r=1;r<rows.length;r++){
+      const row=rows[r]||[];
+      const vnName=vn>=0?String(row[vn]||"").trim():"";
+      const cnName=cn>=0?String(row[cn]||"").trim():"";
+      const className=cls>=0?String(row[cls]||"").trim():"";
+      const studentCode=code>=0?String(row[code]||"").trim():"";
+      const studentStatus=status>=0?String(row[status]||"").trim():"Đang học";
+      if(!vnName && !cnName){skipped++;continue;}
+      let st=null;
+      if(studentCode)st=data.students.find(x=>norm(x.code)===norm(studentCode));
+      if(!st && vnName)st=data.students.find(x=>norm(x.name)===norm(vnName));
+      if(!st && cnName)st=data.students.find(x=>norm(x.chinese_name||x.name_cn)===norm(cnName));
+      // Tạo lớp nếu Sheet có tên lớp mới.
+      let course=null;
+      if(className)course=data.courses.find(c=>norm(c.name)===norm(className));
+      if(className && !course){
+        course={id:Date.now()+Math.random(),name:className,teacher:"",fee:0,fee_mode:"month",fee_per_session:0,course_start_date:"",course_end_date:"",course_sessions:0,desc:"Được tạo từ Google Sheets"};
+        data.courses.push(course);
+      }
+      if(!st){
+        st={id:Date.now()+Math.random(),name:vnName||cnName,code:studentCode||"",course:className||"",course_id:course?.id||"",status:studentStatus||"Đang học",chinese_name:cnName||""};
+        data.students.push(st);created++;
+      }else{
+        if(vnName)st.name=vnName;
+        if(cnName)st.chinese_name=cnName;
+        if(studentCode)st.code=studentCode;
+        if(className){st.course=className;st.course_id=course?.id||st.course_id||"";}
+        if(studentStatus)st.status=studentStatus;
+        updated++;
+      }
+    }
+    data.studentSheetLastSync=new Date().toISOString();
+    persist();renderStudents();renderCourses();
+    alert(`Đã cập nhật danh sách học sinh từ Google Sheets.\\n\\n• Thêm mới: ${created}\\n• Cập nhật: ${updated}\\n• Bỏ qua dòng trống: ${skipped}`);
+  }catch(e){
+    alert("Không thể đọc Google Sheets danh sách học sinh.\\n\\n"+(e?.message||e));
+  }
+}
+let studentSheetAutoSyncTimer=null;
+function autoSyncStudents(){
+  if(!data.studentSheetUrl)return;
+  const last=data.studentSheetLastSync?Date.parse(data.studentSheetLastSync):0;
+  if(Date.now()-last<10*60*1000)return;
+  clearTimeout(studentSheetAutoSyncTimer);
+  studentSheetAutoSyncTimer=setTimeout(()=>syncStudentsFromGoogleSheet(),200);
+}
 function renderStudents(){
+  autoSyncStudents();
   let q=(document.getElementById("studentSearch")?.value||"").toLowerCase();
   let a=data.students.filter(s=>s.name.toLowerCase().includes(q)||(s.code||"").toLowerCase().includes(q));
+  const ss=document.getElementById("studentSheetStatus");
+  if(ss)ss.innerHTML=data.studentSheetUrl?`<div class="hint" style="margin:8px 0">🔗 ${esc(data.studentSheetTitle||"Google Sheets")} · <button type="button" class="btn mini outline" onclick="syncStudentsFromGoogleSheet()">🔄 Cập nhật ngay</button>${data.studentSheetLastSync?` · Cập nhật: ${new Date(data.studentSheetLastSync).toLocaleString("vi-VN")}`:""}</div>`:"";
   studentTable.innerHTML=a.length?`<table><tr><th>Học sinh</th><th>Mã</th><th>Khóa học</th><th>Điểm TB</th><th>Chuyên cần</th><th>Trạng thái</th><th></th></tr>${a.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.code)}</td><td>${esc(s.course||"")}</td><td>${scoreAvg(s)?.toFixed(1)||"–"} ${badge(scoreAvg(s))}</td><td>${att(s)==null?"–":att(s)+"%"}</td><td>${esc(s.status)}</td><td><button type="button" class="btn mini outline" onclick="openStudent('${String(s.id)}')">Sửa</button> <button type="button" class="btn mini danger" onclick="delStudent('${String(s.id)}')">Xóa</button></td></tr>`).join("")}</table>`:'<div class="empty">Chưa có học sinh.</div>';
 }
 function renderCourses(){
@@ -641,11 +829,15 @@ function billingInfo(st,monthKey){
   const mode=(cl?.fee_mode||st.fee?.mode||c?.fee_mode||"course");
   const extraTotal=additionalFeesTotal(st,monthKey);
   if(mode==="monthly"){
-    const price=Number(cl?.fee_per_session??st.fee?.per_session??c?.fee_per_session??0)||0;
+    const price=Number(cl?.fee_per_session??st.fee?.per_session??c?.fee_per_session??c?.fee??0)||0;
     const sessionsForMonth=(mk)=>{
       let sessions=0;
       if(cl?.schedule?.length) sessions=cl.schedule.filter(x=>String(x.date||"").startsWith(mk)).length;
       else if(st.schedule?.length) sessions=st.schedule.filter(x=>String(x.date||"").startsWith(mk)).length;
+      if(!sessions){
+        const className=cl?.name||st.class||st.course||c?.name||"";
+        sessions=(data.schedules||[]).filter(x=>String(x.date||"").startsWith(mk) && String(x.course||"").trim()===String(className).trim()).length;
+      }
       if(!sessions) sessions=Number(cl?.sessions_by_month?.[mk]??st.fee?.sessions_by_month?.[mk]??0)||0;
       return sessions;
     };
@@ -794,7 +986,7 @@ function renderFinance(){
       <td>${remainingHtml}</td>
       <td><span class="fee-status ${cls}">${status}</span></td>
       <td><button type="button" class="btn mini primary" onclick="recordFee('${String(st.id)}')">Ghi nhận</button>
-      <button type="button" class="btn mini outline" onclick="openParentReport('${String(st.id)}')">🧾 Xuất hóa đơn + báo cáo</button></td>
+      <button type="button" class="btn mini outline" onclick="openParentReport('${String(st.id)}')">🧾 Xuất phiếu thu học phí</button></td>
     </tr>`;
   }).join("")}</table>
   <p class="hint" style="margin-top:10px">Đang tính học phí ${monthLabel}. Với lớp thu theo tháng, số tiền = số buổi của lớp trong tháng × đơn giá/buổi; không phụ thuộc điểm danh của học sinh. Nộp thiếu sẽ cộng nợ sang tháng sau; nộp dư sẽ chuyển số dư sang tháng sau.</p>`
@@ -885,7 +1077,7 @@ function openCourse(id){
         <option value="monthly" ${mode==="monthly"?"selected":""}>Thu theo tháng (theo số buổi của lớp)</option>
       </select>
     </div>
-    <div><label>Học phí</label><input id="c_fee" type="number" min="0" value="${c.fee||0}"></div>
+    <div><label id="courseFeeLabel">${mode==="monthly"?"Đơn giá / buổi":"Học phí khóa"}</label><input id="c_fee" type="number" min="0" value="${mode==="monthly"?(c.fee_per_session||c.fee||0):(c.fee||0)}"></div>
   </div>
   <div id="courseFeeDetails" style="margin-top:12px"></div>
   <br><label>Mô tả</label><textarea id="c_desc">${esc(c.desc||"")}</textarea>
@@ -898,6 +1090,8 @@ function toggleCourseFeeFields(cached){
   const sel=document.getElementById("c_fee_mode");
   if(!box||!sel)return;
   const c=cached||data.courses.find(x=>String(x.id)===String(sel.dataset.id||""))||{};
+  const feeLabel=document.getElementById("courseFeeLabel");
+  if(feeLabel)feeLabel.textContent=sel.value==="monthly"?"Đơn giá / buổi":"Học phí khóa";
   if(sel.value==="course"){
     box.innerHTML=`<div class="formgrid three">
       <div><label>Ngày bắt đầu khóa</label><input id="c_start" type="date" value="${c.course_start_date||""}"></div>
@@ -911,45 +1105,48 @@ function toggleCourseFeeFields(cached){
 }
 async function saveCourse(id){
   const old=data.courses.find(x=>String(x.id)===String(id));
-  const name=document.getElementById("c_name").value.trim();
-  const teacher=document.getElementById("c_teacher").value.trim();
-  const fee=+document.getElementById("c_fee").value||0;
-  const fee_mode=document.getElementById("c_fee_mode").value;
-  const desc=document.getElementById("c_desc").value;
-  if(!name)return alert("Nhập tên khóa học");
+  const name=document.getElementById("c_name")?.value.trim()||"";
+  const teacher=document.getElementById("c_teacher")?.value.trim()||"";
+  const fee=Number(document.getElementById("c_fee")?.value)||0;
+  const fee_mode=document.getElementById("c_fee_mode")?.value||"course";
+  const desc=document.getElementById("c_desc")?.value||"";
+  if(!name)return alert("Nhập tên khóa học / lớp.");
+  const start=document.getElementById("c_start")?.value||"";
+  const endDate=document.getElementById("c_end")?.value||"";
+  const sessions=Math.max(0,Number(document.getElementById("c_sessions")?.value)||0);
+  if(fee_mode==="course" && start && endDate && endDate<start)return alert("Ngày kết thúc khóa không được trước ngày bắt đầu.");
 
-  const start=document.getElementById("c_start")?.value||old?.course_start_date||"";
-  const endDate=document.getElementById("c_end")?.value||old?.course_end_date||"";
-  const sessions=Math.max(0,Number(document.getElementById("c_sessions")?.value??old?.course_sessions??0)||0);
-  if(fee_mode==="course" && start && endDate && endDate<start)
-    return alert("Ngày kết thúc khóa không được trước ngày bắt đầu.");
-
-  const payload={
-    name,teacher:teacher||null,fee,fee_mode,
-    course_start_date:fee_mode==="course"?start:null,
-    course_end_date:fee_mode==="course"?endDate:null,
-    course_sessions:fee_mode==="course"?sessions:null,
-    desc:desc||null
-  };
+  // Supabase: only write columns known to exist in the current schema.
+  // Extended fee/class metadata is kept locally so the Save button remains usable
+  // even when the database has not yet been migrated with the optional columns.
+  const basePayload={name,teacher:teacher||null,fee};
   try{
     let row,error;
     if(old){
-      ({data:row,error}=await sb.from("courses").update(payload).eq("id",id).select().single());
+      ({data:row,error}=await sb.from("courses").update(basePayload).eq("id",id).select().single());
     }else{
-      ({data:row,error}=await sb.from("courses").insert(payload).select().single());
+      ({data:row,error}=await sb.from("courses").insert(basePayload).select().single());
     }
     if(error)throw error;
-    const idx=data.courses.findIndex(x=>String(x.id)===String(id));
-    if(idx>=0)data.courses[idx]={...data.courses[idx],...payload,...(row||{})};
-    else data.courses.push({...payload,...(row||{id:uid("course")})});
-    closeModal();persist();renderCourses();
-  }catch(err){
-    // Keep local HTML usable if Supabase is unavailable.
-    const local={...(old||{}),...payload,id:old?.id||uid("course")};
+    const savedId=row?.id||old?.id||uid("course");
+    const local={...(old||{}),id:savedId,name,teacher,fee,desc,fee_mode,
+      fee_per_session:fee_mode==="monthly"?fee:(old?.fee_per_session||0),
+      course_start_date:fee_mode==="course"?start:"",
+      course_end_date:fee_mode==="course"?endDate:"",
+      course_sessions:fee_mode==="course"?sessions:0};
     const idx=data.courses.findIndex(x=>String(x.id)===String(id));
     if(idx>=0)data.courses[idx]=local;else data.courses.push(local);
     closeModal();persist();renderCourses();
-    alert("Đã lưu cục bộ. Chưa đồng bộ Supabase: "+err.message);
+  }catch(err){
+    const local={...(old||{}),id:old?.id||uid("course"),name,teacher,fee,desc,fee_mode,
+      fee_per_session:fee_mode==="monthly"?fee:(old?.fee_per_session||0),
+      course_start_date:fee_mode==="course"?start:"",
+      course_end_date:fee_mode==="course"?endDate:"",
+      course_sessions:fee_mode==="course"?sessions:0};
+    const idx=data.courses.findIndex(x=>String(x.id)===String(id));
+    if(idx>=0)data.courses[idx]=local;else data.courses.push(local);
+    closeModal();persist();renderCourses();
+    alert("Đã lưu khóa học trên thiết bị. Chưa đồng bộ Supabase: "+(err?.message||err));
   }
 }
 function openScoreImport(){
@@ -1024,15 +1221,289 @@ function getAttendanceClasses(){
   });
   return Object.values(map);
 }
+function parseAttendanceSheetUrl(url, monthKey){
+  const m=String(url||"").match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/); if(!m)return null;
+  const gid=(String(url).match(/[?#&]gid=(\d+)/)||[])[1]||"0";
+  const base=`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
+  return base;
+}
+function attendanceMonthFromText(v){
+  const x=String(v||"").replace(/\s+/g," ").trim();
+  let m=x.match(/THÁNG\s*(\d{1,2})\s*[\/.-]\s*(\d{4})/i);
+  if(m)return `${m[2]}-${String(m[1]).padStart(2,"0")}`;
+  m=x.match(/THÁNG\s*(\d{1,2})/i);
+  if(m)return `${new Date().getFullYear()}-${String(m[1]).padStart(2,"0")}`;
+  return "";
+}
+function detectSheetMonthColumns(rows,targetMonth){
+  const wanted=String(targetMonth||"");
+  const found=[];
+  let activeMonth="";
+  for(let r=0;r<Math.min(rows.length,15);r++){
+    for(let c=0;c<(rows[r]||[]).length;c++){
+      const v=String(rows[r][c]||"").trim();
+      const mk=attendanceMonthFromText(v);
+      if(mk)activeMonth=mk;
+      const d=normalizeDateCell(v);
+      if(d){
+        let date=d;
+        if(!/^\d{4}-/.test(date)){
+          const mm=v.match(/(\d{1,2})[\/.-](\d{1,2})/);
+          if(mm){
+            const yr=(activeMonth&&activeMonth.slice(0,4))||wanted.slice(0,4)||String(new Date().getFullYear());
+            date=`${yr}-${String(mm[2]).padStart(2,"0")}-${String(mm[1]).padStart(2,"0")}`;
+          }
+        }
+        if(!wanted || date.slice(0,7)===wanted)found.push({i:c,date});
+      }
+    }
+  }
+  return found;
+}
+function csvRows(text){
+  const rows=[]; let row=[],cell="",q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i],nx=text[i+1];
+    if(ch==='"'){if(q&&nx==='"'){cell+='"';i++;}else q=!q;}
+    else if(ch===','&&!q){row.push(cell.trim());cell="";}
+    else if((ch==='\n'||ch==='\r')&&!q){if(ch==='\r'&&nx==='\n')i++;row.push(cell.trim());if(row.some(x=>x!==""))rows.push(row);row=[];cell="";}
+    else cell+=ch;
+  }
+  row.push(cell.trim());if(row.some(x=>x!==""))rows.push(row);return rows;
+}
+function headerIndex(headers, patterns){return headers.findIndex(h=>patterns.some(p=>p.test(String(h||"").trim())))}
+function normalizeAttName(v){
+  return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/gi,"d").replace(/\s+/g," ").trim().toLowerCase();
+}
+function normalizeDateCell(v){
+  const raw=String(v||"").trim();
+  let m=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if(m)return `${m[3]}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`;
+  m=raw.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
+  if(m)return `${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`;
+  return "";
+}
+function attendanceMark(v){
+  const x=String(v||"").trim().toUpperCase();
+  if(x==="H"||x==="✓"||x==="✔"||/^(HỌC|CÓ MẶT|PRESENT|ĐI HỌC|DI HOC)$/.test(x))return "present";
+  if(x==="N"||x==="X"||/^(NGHỈ|VẮNG|VANG|NGHI|ABSENT|Nghỉ phép)$/i.test(x))return "absent";
+  return "";
+}
+function getAttendanceClassName(st){const cl=getClassForStudent(st);return cl?.name||st.class||st.course||""}
+function classSessionsForMonth(className,monthKey){
+  const meta=(data.attendanceSheetMetaByMonth&&data.attendanceSheetMetaByMonth[monthKey])||data.attendanceSheetMeta||{};
+  if(String(meta.className||"").trim()===String(className||"").trim() && String(meta.month||"")===String(monthKey||"") && Number(meta.sessions)>0){
+    return Number(meta.sessions);
+  }
+  return (data.schedules||[]).filter(x=>String(x.date||"").slice(0,7)===monthKey && String(x.course||"").trim()===String(className||"").trim()).length;
+}
+function openAttendanceSheet(){
+  modalTitle.textContent="🔗 Gắn Google Sheets điểm danh";
+  modalContent.innerHTML=`<div class="notice">
+    <b>Hỗ trợ đúng cấu trúc bảng điểm danh của Trung tâm.</b><br>
+    Hàng ngày có các cột ngày <b>03/08, 07/08, 10/08...</b>; cột đầu là <b>tên tiếng Trung</b>, cột kế là <b>tên tiếng Việt</b>.
+    <br><b>H = Học</b> · <b>N = Nghỉ</b>. Hệ thống tự đếm số cột ngày để ra <b>tổng số buổi học của lớp</b>.
+  </div><br>
+  <label>🏷️ Tiêu đề bảng</label>
+  <input id="attSheetTitle" value="${esc(data.attendanceSheetTitle||"")}" placeholder="Ví dụ: K29 – 丁氏云英 · Tháng 08/2026" style="width:100%;margin-top:8px"><br><br>
+  <label>🔗 Link Google Sheets</label>
+  <input id="attSheetUrl" type="url" value="${esc(data.attendanceSheetUrl||"")}" placeholder="Dán link Google Sheets..." style="width:100%;margin-top:8px"><br><br>
+  <button type="button" class="btn primary" onclick="saveAttendanceSheet()">💾 Lưu & đọc điểm danh</button>
+  ${data.attendanceSheetUrl?` <button type="button" class="btn outline" onclick="syncAttendanceFromGoogleSheet()">🔄 Đọc lại</button>`:""}`;
+  modal.classList.add("show");
+}
+function saveAttendanceSheet(){
+  const url=document.getElementById("attSheetUrl")?.value.trim();
+  if(!parseAttendanceSheetUrl(url))return alert("Vui lòng nhập đúng link Google Sheets.");
+  data.attendanceSheetUrl=url;
+  data.attendanceSheetTitle=document.getElementById("attSheetTitle")?.value.trim()||"Bảng điểm danh Google Sheets";
+  data.attendanceSource="google";
+  persist();closeModal();syncAttendanceFromGoogleSheet();
+}
+async function syncAttendanceFromGoogleSheet(targetMonth){
+  targetMonth=targetMonth||data.attendanceMonth||new Date().toISOString().slice(0,7);
+  const url=parseAttendanceSheetUrl(data.attendanceSheetUrl,targetMonth);if(!url)return alert("Chưa có link Google Sheets điểm danh.");
+  try{
+    const sheet=await readGoogleSheet(data.attendanceSheetUrl);
+    const rows=[sheet.headers||[],...(sheet.rows||[])];
+    if(rows.length<3)throw new Error("Bảng chưa có đủ dữ liệu.");
+
+    // ===== FORMAT MỚI: MA TRẬN NGÀY HỌC, TỰ CHỌN THÁNG =====
+    // Hỗ trợ bảng có tiêu đề THÁNG 8/2026 và các cột ngày 03/08, 07/08...
+    // Khi đổi tháng trong hệ thống, chỉ lấy các cột thuộc tháng đó.
+    let dateRow=-1,dateCols=detectSheetMonthColumns(rows,targetMonth);
+    for(let r=0;r<Math.min(rows.length,15);r++){
+      const row=rows[r]||[];
+      if(row.some(v=>/THÁNG\s*\d{1,2}(?:\s*[\/.-]\s*\d{4})?/i.test(String(v||"")))){
+        const candidates=[];
+        let activeMonth="";
+        for(let c=0;c<row.length;c++){
+          const v=String(row[c]||"");
+          const mk=attendanceMonthFromText(v);
+          if(mk)activeMonth=mk;
+          const d=normalizeDateCell(v);
+          if(d && (!targetMonth || d.slice(0,7)===targetMonth))candidates.push({i:c,date:d});
+        }
+        if(candidates.length)dateCols=candidates;
+      }
+    }
+    // Fallback: tìm hàng có nhiều ô ngày thuộc tháng cần lấy.
+    if(!dateCols.length){
+      for(let r=0;r<Math.min(rows.length,20);r++){
+        const cols=[];
+        (rows[r]||[]).forEach((v,i)=>{
+          const d=normalizeDateCell(v);
+          if(d && (!targetMonth || d.slice(0,7)===targetMonth))cols.push({i,date:d});
+        });
+        if(cols.length){dateRow=r;dateCols=cols;break;}
+      }
+    }else{
+      // Thường ngày nằm cùng hàng tiêu đề tháng; tìm hàng dữ liệu tên phía dưới.
+      dateRow=0;
+      for(let r=0;r<Math.min(rows.length,15);r++){
+        if((rows[r]||[]).some(v=>/中文|越南姓名|tên tiếng việt|tên tiếng trung/i.test(String(v||"")))){
+          dateRow=Math.max(0,r);
+          break;
+        }
+      }
+      // Nếu hàng chứa ngày cụ thể có thể tìm trực tiếp.
+      const rr=rows.findIndex(row=>dateCols.some(c=>String(row[c.i]||"").trim()===String(c.date)));
+      if(rr>=0)dateRow=rr;
+    }
+    if(dateRow<0)dateRow=1;
+    if(!dateCols.length)throw new Error(`Không tìm thấy cột ngày cho tháng ${targetMonth}.`);
+
+    // Chuẩn hóa năm/tháng cho dạng ngày 03/08.
+    const titleText=rows.slice(0,Math.min(dateRow+1,15)).flat().filter(Boolean).join(" ");
+    const tm=titleText.match(/THÁNG\s*(\d{1,2})\s*[\/-]\s*(\d{4})/i);
+    const inferredMonth=tm?`${tm[2]}-${String(tm[1]).padStart(2,"0")}`:targetMonth;
+    dateCols=dateCols.map(c=>{
+      if(/^\d{4}-/.test(c.date))return c;
+      const raw=String(rows[dateRow][c.i]||"");
+      const mm=raw.match(/(\d{1,2})[\/.-](\d{1,2})/);
+      return mm?{i:c.i,date:`${inferredMonth.slice(0,4)}-${String(mm[2]).padStart(2,"0")}-${String(mm[1]).padStart(2,"0")}`}:c;
+    }).filter(c=>!targetMonth||c.date.slice(0,7)===targetMonth);
+
+    const firstDateCol=dateCols[0].i;
+    const totalCol=rows.flatMap((row,r)=>row.map((v,i)=>({v,r,i})))
+      .find(x=>/TỔNG\s*SỐ\s*BUỔI\s*HỌC/i.test(String(x.v||"")))?.i ?? -1;
+    const sessionCols=dateCols.filter(c=>c.i!==totalCol);
+    const sessions=sessionCols.length;
+
+    let vnNameCol=-1,cnNameCol=-1;
+    for(let r=0;r<=Math.min(dateRow,10);r++){
+      (rows[r]||[]).forEach((v,i)=>{
+        const x=String(v||"").trim();
+        if(/越南姓名|tên tiếng việt|tên việt|việt nam/i.test(x))vnNameCol=i;
+        if(/中文|tên tiếng trung|tiếng trung/i.test(x))cnNameCol=i;
+      });
+    }
+    if(vnNameCol<0)vnNameCol=Math.max(0,firstDateCol-1);
+    if(cnNameCol<0)cnNameCol=Math.max(0,firstDateCol-2);
+
+    let sheetClass="";
+    for(let r=0;r<Math.min(dateRow+1,10);r++){
+      const first=String(rows[r]?.[0]||"").trim();
+      if(first && !/THÁNG|TỔNG\s*SỐ|中文|越南姓名/i.test(first) && !normalizeDateCell(first) && first.length<80){
+        sheetClass=first;break;
+      }
+    }
+
+    data.attendance=data.attendance||{};
+    let imported=0, skipped=0, matchedStudents=0;
+    const allStudents=data.students||[];
+
+    // Mỗi hàng học sinh: đọc tên Việt, fallback tên Trung; mỗi ô H/N là một buổi.
+    for(let r=dateRow+2;r<rows.length;r++){
+      const row=rows[r]||[];
+      const vn=String(row[vnNameCol]||"").trim();
+      const cn=String(row[cnNameCol]||"").trim();
+      if(!vn && !cn)continue;
+      if(/TỔNG|THÁNG|中文|越南姓名/i.test(vn+" "+cn))continue;
+
+      let st=allStudents.find(x=>normalizeAttName(x.name)===normalizeAttName(vn));
+      if(!st && cn)st=allStudents.find(x=>String(x.chinese_name||x.name_cn||x.nameChinese||"").trim()===cn);
+      if(!st && cn)st=allStudents.find(x=>String(x.name||"").trim()===cn);
+      if(!st){skipped++;continue;}
+      matchedStudents++;
+
+      sessionCols.forEach(col=>{
+        const status=attendanceMark(row[col.i]);
+        if(!status)return;
+        const date=col.date;
+        data.attendance[date]=data.attendance[date]||{};
+        data.attendance[date][String(st.id)]={
+          status,
+          note:"",
+          class_id:st.class_id||getAttendanceClassName(st),
+          source:"google_sheet",
+          mark:status==="present"?"H":"N"
+        };
+        imported++;
+      });
+    }
+
+    const month=targetMonth;
+    data.attendanceSheetMetaByMonth=data.attendanceSheetMetaByMonth||{};
+    data.attendanceSheetMetaByMonth[month]={
+      className:sheetClass,
+      month,
+      sessions,
+      dates:sessionCols.map(x=>x.date),
+      vnNameCol,cnNameCol,
+      syncedAt:new Date().toISOString()
+    };
+    data.attendanceSheetMeta=data.attendanceSheetMetaByMonth[month];
+    data.attendanceSheetSessions=data.attendanceSheetSessions||{};
+    const classKey=sheetClass||"__current__";
+    data.attendanceSheetSessions[`${classKey}__${month}`]=sessions;
+
+    persist();renderAttendance();
+    alert(`Đã cập nhật điểm danh Google Sheets cho tháng ${targetMonth}.\n\n• ${matchedStudents} học sinh nhận diện được\n• ${sessions} buổi học trong tháng\n• ${imported} lượt H/N được cập nhật${skipped?`\n• ${skipped} dòng không khớp học sinh`:""}\n\nH = Học · N = Nghỉ`);
+  }catch(err){
+    alert("Không đọc được Google Sheets điểm danh.\n\n"+(err?.message||err)+"\n\nHãy đặt quyền chia sẻ Google Sheets là: Bất kỳ ai có liên kết → Người xem.");
+  }
+}
+function calculateClassSessions(){
+  const classes=getAttendanceClasses(),month=(data.attendanceMonth||new Date().toISOString().slice(0,7));
+  const meta=data.attendanceSheetMeta||{};
+  const list=classes.map(c=>({
+    name:c.name,
+    sessions:classSessionsForMonth(c.name,month),
+    students:c.students.length
+  }));
+  // Nếu bảng Google Sheets vừa đọc là bảng của lớp đang chọn, ưu tiên số cột ngày
+  // trong bảng vì đây chính là số buổi thực tế của lớp.
+  if(meta.sessions && String(meta.month)===String(month) && meta.className){
+    const hit=list.find(x=>String(x.name).trim()===String(meta.className).trim());
+    if(hit)hit.sessions=Number(meta.sessions);
+  }
+  modalTitle.textContent="🔢 Số buổi học của từng lớp";
+  modalContent.innerHTML=`<div class="notice">Tự tính số buổi từ <b>Lịch học</b>. Nếu đã gắn Google Sheets theo mẫu ma trận của Trung tâm, hệ thống ưu tiên <b>số cột ngày H/N</b> của bảng đó.</div><table><tr><th>Lớp</th><th>Số học sinh</th><th>Số buổi trong tháng</th></tr>${list.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${x.students}</td><td><b>${x.sessions} buổi</b></td></tr>`).join("")||'<tr><td colspan="3">Chưa có lớp.</td></tr>'}</table><br><button type="button" class="btn primary" onclick="closeModal()">Đóng</button>`;
+  modal.classList.add("show");
+}
+let attendanceAutoSyncTimer=null;
+function autoSyncAttendanceMonth(month){
+  if(!data.attendanceSheetUrl || !month)return;
+  const meta=data.attendanceSheetMetaByMonth?.[month];
+  const last=meta?.syncedAt?Date.parse(meta.syncedAt):0;
+  // Tự đồng bộ khi mở tháng nếu dữ liệu cũ hơn 10 phút.
+  if(Date.now()-last<10*60*1000)return;
+  clearTimeout(attendanceAutoSyncTimer);
+  attendanceAutoSyncTimer=setTimeout(()=>syncAttendanceFromGoogleSheet(month),150);
+}
 function renderAttendance(){
-  const classes=getAttendanceClasses(),date=data.attendanceDate||new Date().toISOString().slice(0,10);
+  const classes=getAttendanceClasses(),date=data.attendanceDate||new Date().toISOString().slice(0,10),month=date.slice(0,7);
+  data.attendanceMonth=month;
+  autoSyncAttendanceMonth(month);
   const selected=String(data.attendanceClassId||classes[0]?.id||"");
-  const cls=classes.find(c=>String(c.id)===selected)||classes[0],box=document.getElementById("attClassPanel");
-  if(!box)return;
+  const cls=classes.find(c=>String(c.id)===selected)||classes[0],box=document.getElementById("attClassPanel");if(!box)return;
   if(!cls){box.innerHTML='<div class="empty">Chưa có lớp/học sinh để điểm danh.</div>';return;}
   data.attendanceClassId=cls.id;
+  const classSessions=classSessionsForMonth(cls.name,month);
   const rec=data.attendance?.[date]||{};
-  box.innerHTML=`<div class="formgrid two"><div><label>Chọn lớp</label><select onchange="data.attendanceClassId=this.value;renderAttendance()">${classes.map(c=>`<option value="${esc(String(c.id))}" ${String(c.id)===String(cls.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Ngày học</label><input type="date" value="${date}" onchange="data.attendanceDate=this.value;renderAttendance()"></div></div><br><div class="notice">📋 <b>${esc(cls.name)}</b> — Điểm danh theo lớp. Không phụ thuộc vào cách tính học phí.</div><table><tr><th>STT</th><th>Học sinh</th><th>Có mặt</th><th>Vắng</th><th>Ghi chú</th></tr>${cls.students.map((st,i)=>{let a=rec[String(st.id)]||{};return `<tr><td>${i+1}</td><td><b>${esc(st.name)}</b></td><td><input type="radio" name="att_${st.id}" value="present" ${a.status!=="absent"?"checked":""}></td><td><input type="radio" name="att_${st.id}" value="absent" ${a.status==="absent"?"checked":""}></td><td><input id="att_note_${st.id}" value="${esc(a.note||"")}" placeholder="Ghi chú"></td></tr>`}).join("")}</table><br><button type="button" class="btn primary" onclick="saveAttendanceClass()">💾 Lưu điểm danh lớp</button>`;
+  box.innerHTML=`<div class="formgrid two"><div><label>Chọn lớp</label><select onchange="data.attendanceClassId=this.value;renderAttendance()">${classes.map(c=>`<option value="${esc(String(c.id))}" ${String(c.id)===String(cls.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Ngày học</label><input type="date" value="${date}" onchange="data.attendanceDate=this.value;data.attendanceMonth=this.value.slice(0,7);renderAttendance();if(data.attendanceSheetUrl)syncAttendanceFromGoogleSheet(this.value.slice(0,7))"></div></div><div class="notice" style="margin-top:12px">📋 <b>${esc(cls.name)}</b> — Tháng ${month.slice(5)}/${month.slice(0,4)}: <b>${classSessions} buổi học</b>. Có thể điểm danh thủ công bên dưới${data.attendanceSheetUrl?" hoặc đồng bộ tự động từ Google Sheets.":"."}
+${data.attendanceSheetUrl?`<div style="margin-top:8px">🔄 <button type="button" class="btn mini outline" onclick="syncAttendanceFromGoogleSheet('${month}')">Cập nhật tháng ${month.slice(5)}/${month.slice(0,4)}</button>
+${data.attendanceSheetMetaByMonth?.[month]?.syncedAt?` <span class="hint">Cập nhật lần cuối: ${new Date(data.attendanceSheetMetaByMonth[month].syncedAt).toLocaleString("vi-VN")}</span>`:""}</div>`:""}</div>${data.attendanceSheetUrl?`<div class="hint" style="margin:8px 0">🔗 ${esc(data.attendanceSheetTitle||"Google Sheets")} · <button type="button" class="btn mini outline" onclick="syncAttendanceFromGoogleSheet()">🔄 Đọc lại</button> <button type="button" class="btn mini danger" onclick="data.attendanceSheetUrl='';data.attendanceSheetTitle='';data.attendanceSource='manual';persist();renderAttendance()">Gỡ link</button></div>`:""}<table><tr><th>STT</th><th>Học sinh</th><th>Có mặt</th><th>Vắng</th><th>Ghi chú</th></tr>${cls.students.map((st,i)=>{let a=rec[String(st.id)]||{};return `<tr><td>${i+1}</td><td><b>${esc(st.name)}</b></td><td><input type="radio" name="att_${st.id}" value="present" ${a.status!=="absent"?"checked":""}></td><td><input type="radio" name="att_${st.id}" value="absent" ${a.status==="absent"?"checked":""}></td><td><input id="att_note_${st.id}" value="${esc(a.note||"")}" placeholder="Ghi chú"></td></tr>`}).join("")}</table><br><button type="button" class="btn primary" onclick="saveAttendanceClass()">💾 Lưu điểm danh lớp</button>`;
   renderAttendanceHistory();
 }
 function saveAttendanceClass(){
@@ -1040,7 +1511,7 @@ function saveAttendanceClass(){
   data.attendance=data.attendance||{};data.attendance[date]=data.attendance[date]||{};
   getAttendanceClasses().find(c=>String(c.id)===String(classId))?.students.forEach(st=>{
     const r=document.querySelector('input[name="att_'+st.id+'"]:checked'),n=document.getElementById("att_note_"+st.id);
-    data.attendance[date][String(st.id)]={status:r?.value||"present",note:n?.value||"",class_id:classId};
+    data.attendance[date][String(st.id)]={status:r?.value||"present",note:n?.value||"",class_id:classId,source:"manual",mark:(r?.value||"present")==="present"?"H":"N"};
   });
   persist();renderAttendance();alert("Đã lưu điểm danh lớp.");
 }
@@ -1049,7 +1520,7 @@ function renderAttendanceHistory(){
   const classId=String(data.attendanceClassId||""),rows=[];
   Object.keys(data.attendance||{}).sort().reverse().forEach(d=>{
     const rec=data.attendance[d]||{};
-    getAttendanceClasses().find(c=>String(c.id)===classId)?.students.forEach(st=>{const a=rec[String(st.id)];if(a)rows.push(`<tr><td>${d}</td><td>${esc(st.name)}</td><td>${a.status==="absent"?"Vắng":"Có mặt"}</td><td>${esc(a.note||"")}</td></tr>`)});
+    getAttendanceClasses().find(c=>String(c.id)===classId)?.students.forEach(st=>{const a=rec[String(st.id)];if(a)rows.push(`<tr><td>${d}</td><td>${esc(st.name)}</td><td>${a.mark==="N"||a.status==="absent"?"Nghỉ":"Học"}</td><td>${esc(a.note||"")}</td></tr>`)});
   });
   box.innerHTML=rows.length?`<table><tr><th>Ngày</th><th>Học sinh</th><th>Trạng thái</th><th>Ghi chú</th></tr>${rows.join("")}</table>`:'<div class="empty">Chưa có lịch sử.</div>';
 }
@@ -1353,7 +1824,7 @@ function getMonthlyScoresForStudent(st,key){
   }).filter(x=>x.score!=="");
 }
 function openParentReportPicker(){
-  modalTitle.textContent="🧾 Xuất hóa đơn + báo cáo tháng";
+  modalTitle.textContent="🧾 Xuất phiếu thu học phí tháng";
   modalContent.innerHTML=`<label>Chọn học sinh</label>
   <select id="reportStudentPicker" style="width:100%;margin-top:8px">${data.students.map(st=>`<option value="${String(st.id)}">${esc(st.name)} — ${esc(getClassForStudent(st)?.name||st.class||st.course||"")}</option>`).join("")}</select>
   <br><br><button type="button" class="btn primary" onclick="openParentReport(document.getElementById('reportStudentPicker').value)">Tiếp tục</button>`;
@@ -1366,23 +1837,20 @@ function openParentReport(id){
   const key=monthKeyNow(), info=billingInfo(st,key);
   const paid=info.mode==="monthly"?Number(st.fee?.monthly_paid?.[key]||0):Number(st.fee?.paid||0);
   const left=Math.max(0,info.total-paid);
-  modalTitle.textContent="🧾 Phiếu gửi phụ huynh";
+  modalTitle.textContent="🧾 Phiếu thu học phí";
   modalContent.innerHTML=`<div class="formgrid two">
     <div><label>Tháng báo cáo</label><input id="parentReportMonth" type="month" value="${key}"></div>
     <div><label>Người nhận</label><input id="parentReportRecipient" placeholder="Phụ huynh ${esc(st.name)}"></div>
   </div>
   <br>
-  <div class="notice">💬 Nhận xét được quản lý tại mục <b>Nhận xét học sinh</b> và sẽ tự động tích hợp vào phiếu khi xuất.</div>
-  <br>
-  <div class="notice">Phiếu sẽ tự cộng <b>nợ học phí các tháng trước</b> vào kỳ đang chọn và kèm <b>tình hình học tập/chuyên cần</b> của học sinh. Nếu đã thanh toán đủ, phiếu chỉ hiển thị tình hình học tập.</div>
-  <br><button type="button" class="btn primary" onclick="printParentReport('${String(id)}')">🖨️ Xuất / In báo cáo</button>`;
+  <div class="notice">Phiếu thu sẽ tự cộng <b>nợ học phí các tháng trước</b> và các <b>chi phí phát sinh</b> vào kỳ đang chọn.</div>
+  <br><button type="button" class="btn primary" onclick="printParentReport('${String(id)}')">🖨️ Xuất / In phiếu thu</button>`;
   modal.classList.add("show");
 }
 function printParentReport(id){
   const st=data.students.find(x=>String(x.id)===String(id)); if(!st)return;
   const key=document.getElementById("parentReportMonth")?.value||monthKeyNow();
   const recipient=document.getElementById("parentReportRecipient")?.value.trim()||("Phụ huynh "+st.name);
-  const teacherNote=st.remarks?.[key]||st.teacher_note||st.teacherNote||"Chưa có nhận xét.";
   const info=billingInfo(st,key);
   const additionalFees=getAdditionalFees(st,key);
   const additionalFeeTotal=additionalFees.reduce((sum,x)=>sum+(Number(x.quantity)||0)*(Number(x.unitPrice??x.price)||0),0);
@@ -1390,14 +1858,9 @@ function printParentReport(id){
   const left=Math.max(0,info.total-paid);
   const fullyPaid=Number(info.total||0)>0&&left<=0;
   const cls=getClassForStudent(st)?.name||st.class||st.course||"";
-  const attendance=getMonthlyAttendanceForStudent(st.id,key);
-  const present=attendance.filter(x=>x.status!=="absent").length, absent=attendance.filter(x=>x.status==="absent").length;
-  const scores=getMonthlyScoresForStudent(st,key);
   const center=data.center||{};
   const logo=LOGO;
   const money=n=>Number(n||0).toLocaleString("vi-VN")+"đ";
-  const scoreRows=scores.length?scores.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(String(x.score))}</td></tr>`).join(""):'<tr><td colspan="2">Chưa có điểm được ghi nhận.</td></tr>';
-  const attendanceRows=attendance.length?attendance.map(a=>`<tr><td>${esc(a.date)}</td><td>${a.status==="absent"?"Vắng":"Có mặt"}</td><td>${esc(a.note||"")}</td></tr>`).join(""):'<tr><td colspan="3">Chưa có dữ liệu điểm danh trong tháng.</td></tr>';
   const excess=info.mode==="monthly"
     ? Math.max(0,-(info.balance||0))
     : Math.max(0,paid-info.total);
@@ -1432,7 +1895,7 @@ function printParentReport(id){
 @media print{
   .course-summary{break-inside:avoid}
 }
-</style><meta charset="utf-8"><title>Phiếu học tập - ${esc(st.name)}</title>
+</style><meta charset="utf-8"><title>Phiếu thu học phí - ${esc(st.name)}</title>
   <style>
   *{box-sizing:border-box}
   body{margin:0;background:#fff;color:#24343d;font-family:"Segoe UI",Arial,sans-serif}
@@ -1526,7 +1989,7 @@ function printParentReport(id){
     <div class="doc-meta"><strong>HỌC PHÍ</strong><br>Tháng ${esc(String(key).slice(5,7))}/${esc(String(key).slice(0,4))}<br>Ngày xuất: ${new Date().toLocaleDateString("vi-VN")}</div>
   </div>
 
-  <div class="title">PHIẾU HỌC TẬP / THÔNG BÁO HỌC PHÍ</div>
+  <div class="title">PHIẾU THU HỌC PHÍ</div>
 
   <div class="info">
     <div><b>Học sinh:</b> ${esc(st.name)}</div>
@@ -1556,78 +2019,52 @@ function printParentReport(id){
 
   <div class="section-title"><span class="ico">🧾</span>Học phí</div>
   <div class="fee">
-    <div class="fee-row"><span class="fee-main-label">Hình thức</span><strong>${info.mode==="monthly"?"Theo tháng":"Theo khóa"}</strong></div>
+    <div class="fee-row">
+      <span class="fee-main-label">Hình thức</span>
+      <strong>${info.mode==="monthly"?"Theo tháng":"Theo khóa"}</strong>
+    </div>
 
     ${info.mode==="monthly"?`
-    ${info.arrears>0?`<div class="fee-row"><span>Nợ các tháng trước</span><strong>${money(info.arrears)}</strong></div>`:""}
-    ${info.creditBefore>0?`<div class="fee-row"><span>Dư từ các tháng trước</span><strong>${money(info.creditBefore)}</strong></div>`:""}
-    <div class="fee-row"><span>Số buổi của lớp trong tháng</span><strong>${info.sessions} buổi</strong></div>
-    <div class="fee-row"><span>Đơn giá / buổi</span><strong>${money(info.price)}</strong></div>
-    <div class="fee-row"><span>Học phí tháng này</span><strong>${money(info.currentTotal)}</strong></div>`:
-    `<div class="fee-row"><span>Học phí theo khóa</span><strong>${money(info.tuitionTotal??info.total)}</strong></div>`}
-
-    ${additionalFees.length?`
-    <div class="additional-fee-box">
-      <div class="additional-fee-head">
-        <span>➕ CHI PHÍ PHÁT SINH</span>
-        <span class="additional-fee-total">${money(additionalFeeTotal)}</span>
-      </div>
-      <table class="additional-fee-table">
-        <tr>
-          <th>STT</th>
-          <th>TÊN PHÍ PHÁT SINH</th>
-          <th>SỐ LƯỢNG</th>
-          <th>ĐƠN GIÁ</th>
-          <th>THÀNH TIỀN</th>
-        </tr>
-        ${additionalFees.map((x,i)=>`
-          <tr>
-            <td>${i+1}</td>
-            <td>${esc(x.name)}</td>
-            <td>${Number(x.quantity)||0}</td>
-            <td>${money(x.unitPrice)}</td>
-            <td>${money((Number(x.quantity)||0)*(Number(x.unitPrice)||0))}</td>
-          </tr>`).join("")}
-      </table>
-      
+    <div class="fee-row">
+      <span>Số buổi học trong tháng</span>
+      <strong>${info.sessions} buổi</strong>
+    </div>
+    ${info.arrears>0?`
+    <div class="fee-row">
+      <span>Tồn dư kỳ trước</span>
+      <strong>${money(info.arrears)}</strong>
     </div>`:""}
-
-    ${info.mode==="monthly"?`
-    <div class="fee-row subtotal"><strong>Phải thu kỳ này</strong><strong>${money(info.total)}</strong></div>`:
-    `<div class="fee-row subtotal"><strong>Tổng phải thu</strong><strong>${money(info.total)}</strong></div>`}
-
-    <div class="fee-row"><span>Đã thu</span><strong>${money(paid)}</strong></div>
-    ${paid>info.total?`<div class="fee-row"><span>Đã thu dư</span><strong>${money(paid-info.total)}</strong></div>`:""}
-
+    ${info.creditBefore>0?`
+    <div class="fee-row">
+      <span>Tồn dư kỳ trước</span>
+      <strong>-${money(info.creditBefore)}</strong>
+    </div>`:""}
+    ${additionalFees.length?`
+    <div class="fee-row">
+      <span>Chi phí phát sinh</span>
+      <strong>${money(additionalFeeTotal)}</strong>
+    </div>`:""}
     <div class="fee-row grand-total">
-      <strong>${info.mode==="monthly"&&info.balance<0?"Dư chuyển tháng sau":"Còn lại"}</strong>
-      <strong>${money(info.mode==="monthly"&&info.balance<0?Math.abs(info.balance):left)}</strong>
+      <strong>Tổng</strong>
+      <strong>${money(Math.max(0,Number(info.currentTotal||0)+Number(additionalFeeTotal||0)+Number(info.arrears||0)-Number(info.creditBefore||0)))}</strong>
+    </div>`:
+    `
+    <div class="fee-row">
+      <span>Học phí theo khóa</span>
+      <strong>${money(info.tuitionTotal??info.total)}</strong>
     </div>
-    <div class="fee-row status"><strong>Trạng thái</strong><strong>${info.mode==="monthly"&&info.balance<0?"Đã thanh toán dư – chuyển tháng sau":status}</strong></div>
+    ${additionalFees.length?`
+    <div class="fee-row">
+      <span>Chi phí phát sinh</span>
+      <strong>${money(additionalFeeTotal)}</strong>
+    </div>`:""}
+    <div class="fee-row grand-total">
+      <strong>Tổng</strong>
+      <strong>${money(Number(info.tuitionTotal||0)+Number(additionalFeeTotal||0))}</strong>
+    </div>`}
   </div>
 
-  <div class="section-title"><span class="ico">📚</span>Tình hình học tập trong tháng</div>
-  <div class="learning">
-    <div class="summary">
-      <div><b>Chuyên cần:</b> ${present} có mặt, ${absent} vắng</div>
-      <div><b>Trạng thái học phí:</b> ${status}</div>
-    </div>
-    <table><tr><th>Tiêu chí</th><th>Điểm gần nhất</th></tr>${scoreRows}</table>
-  </div>
 
-  <div class="section-title"><span class="ico">🗓️</span>Chi tiết điểm danh tháng</div>
-  <div class="attendance">
-    <table><tr><th>Ngày</th><th>Trạng thái</th><th>Ghi chú</th></tr>${attendanceRows}</table>
-  </div>
-
-  <div class="section-title"><span class="ico">💬</span>Nhận xét giáo viên</div>
-  <div class="comment"><div class="comment-box">${esc(teacherNote)}</div></div>
-
-  <div class="sign">
-    <div>GIÁO VIÊN<div class="sign-line">________________</div></div>
-    <div>TRUNG TÂM NGOẠI NGỮ GIA LẠC<div class="sign-line">________________</div></div>
-  </div>
-  <div class="footer">♡ Cảm ơn Quý phụ huynh đã luôn đồng hành cùng Trung tâm Ngoại ngữ Gia Lạc!</div>
   </div></body></html>`);
   win.document.close();
   closeModal();
