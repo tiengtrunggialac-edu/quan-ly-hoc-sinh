@@ -46,6 +46,10 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1
 .fee-none{background:#eef2f3;color:#6f7f86}
 .fee-progress{font-size:11px;color:var(--muted);margin-top:4px}
 .brand .logo{width:76px;height:76px;object-fit:contain;display:block;flex:0 0 76px}
+
+.course-group-header:hover{background:rgba(42,153,127,.06)!important}
+.course-group-header:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+
 </style>
 <style>
 .course-summary{
@@ -660,13 +664,47 @@ function autoSyncStudents(){
   clearTimeout(studentSheetAutoSyncTimer);
   studentSheetAutoSyncTimer=setTimeout(()=>syncStudentsFromGoogleSheet(),200);
 }
+
+function toggleCourseStudentGroup(groupId){
+  const body=document.getElementById(groupId);
+  const icon=document.querySelector(`[data-course-toggle="${groupId}"] .course-toggle-icon`);
+  if(!body)return;
+  const isOpen=body.style.display!=="none";
+  body.style.display=isOpen?"none":"block";
+  if(icon)icon.textContent=isOpen?"＋":"−";
+}
+
 function renderStudents(){
   autoSyncStudents();
-  let q=(document.getElementById("studentSearch")?.value||"").toLowerCase();
-  let a=data.students.filter(s=>s.name.toLowerCase().includes(q)||(s.code||"").toLowerCase().includes(q));
+  const q=(document.getElementById("studentSearch")?.value||"").trim().toLowerCase();
+  const a=data.students.filter(s=>String(s.name||"").toLowerCase().includes(q)||(s.code||"").toLowerCase().includes(q));
   const ss=document.getElementById("studentSheetStatus");
   if(ss)ss.innerHTML=data.studentSheetUrl?`<div class="hint" style="margin:8px 0">🔗 ${esc(data.studentSheetTitle||"Google Sheets")} · <button type="button" class="btn mini outline" onclick="syncStudentsFromGoogleSheet()">🔄 Cập nhật ngay</button>${data.studentSheetLastSync?` · Cập nhật: ${new Date(data.studentSheetLastSync).toLocaleString("vi-VN")}`:""}</div>`:"";
-  studentTable.innerHTML=a.length?`<table><tr><th>Học sinh</th><th>Mã</th><th>Khóa học</th><th>Điểm TB</th><th>Chuyên cần</th><th>Trạng thái</th><th></th></tr>${a.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.code)}</td><td>${esc(s.course||"")}</td><td>${scoreAvg(s)?.toFixed(1)||"–"} ${badge(scoreAvg(s))}</td><td>${att(s)==null?"–":att(s)+"%"}</td><td>${esc(s.status)}</td><td><button type="button" class="btn mini outline" onclick="openStudent('${String(s.id)}')">Sửa</button> <button type="button" class="btn mini danger" onclick="delStudent('${String(s.id)}')">Xóa</button></td></tr>`).join("")}</table>`:'<div class="empty">Chưa có học sinh.</div>';
+
+  if(!a.length){studentTable.innerHTML='<div class="empty">Chưa có học sinh phù hợp.</div>';return;}
+
+  const groups=[];
+  (data.courses||[]).forEach(c=>{
+    const students=a.filter(s=>String(s.course_id)===String(c.id));
+    if(students.length)groups.push({id:c.id,name:c.name||"Chưa đặt tên",students});
+  });
+  const unassigned=a.filter(s=>!(data.courses||[]).some(c=>String(c.id)===String(s.course_id)));
+  if(unassigned.length)groups.push({id:"unassigned",name:"Chưa xếp khóa học",students:unassigned});
+
+  studentTable.innerHTML=groups.map((g,i)=>{
+    const gid=`student-course-group-${i}-${String(g.id).replace(/[^a-zA-Z0-9_-]/g,"")}`;
+    const shouldOpen=!!q;
+    return `<div class="panel" style="margin-bottom:14px;padding:0;border-left:4px solid var(--primary);overflow:hidden">
+      <button type="button" class="course-group-header" data-course-toggle="${gid}" onclick="toggleCourseStudentGroup('${gid}')" style="width:100%;border:0;background:transparent;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;text-align:left">
+        <span style="display:flex;align-items:center;gap:10px"><span class="course-toggle-icon" style="font-size:20px;font-weight:800">${shouldOpen?"−":"＋"}</span><span><b style="font-size:18px">📚 ${esc(g.name)}</b> <span class="badge ok">${g.students.length} học sinh</span></span></span>
+        ${g.id!=="unassigned"?`<span onclick="event.stopPropagation()" style="flex-shrink:0"><button type="button" class="btn mini primary" onclick="openStudent('', '${String(g.id)}')">＋ Thêm học sinh</button></span>`:""}
+      </button>
+      <div id="${gid}" style="display:${shouldOpen?"block":"none"};padding:0 16px 16px">
+        <table><tr><th>Học sinh</th><th>Mã</th><th>Điểm TB</th><th>Chuyên cần</th><th>Trạng thái</th><th></th></tr>
+        ${g.students.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.code)}</td><td>${scoreAvg(s)?.toFixed(1)||"–"} ${badge(scoreAvg(s))}</td><td>${att(s)==null?"–":att(s)+"%"}</td><td>${esc(s.status)}</td><td><button type="button" class="btn mini outline" onclick="openStudent('${String(s.id)}')">Sửa</button> <button type="button" class="btn mini danger" onclick="delStudent('${String(s.id)}')">Xóa</button></td></tr>`).join("")}</table>
+      </div>
+    </div>`;
+  }).join("");
 }
 function renderCourses(){
   courseTable.innerHTML=data.courses.length?`<table><tr><th>Khóa học</th><th>Giáo viên</th><th>Học phí</th><th>Số học sinh</th><th></th></tr>${data.courses.map(c=>`<tr><td><b>${esc(c.name)}</b><br><small>${esc(c.desc)}</small></td><td>${esc(c.teacher)}</td><td>${(+c.fee||0).toLocaleString("vi-VN")}đ</td><td>${data.students.filter(s=>String(s.course_id)===String(c.id)).length}</td><td><button type="button" class="btn mini outline" onclick="openCourse('${String(c.id)}')">Sửa</button> <button type="button" class="btn mini danger" onclick="delCourse('${String(c.id)}')">Xóa</button></td></tr>`).join("")}</table>`:'<div class="empty">Chưa có khóa học.</div>';
@@ -968,60 +1006,52 @@ function renderFinance(){
   const now=new Date();
   const monthKey=String(now.getFullYear())+"-"+String(now.getMonth()+1).padStart(2,"0");
   const monthLabel="Tháng "+String(now.getMonth()+1).padStart(2,"0")+"/"+now.getFullYear();
-  financeTable.innerHTML=data.students.length?`<table>
-  <tr><th>Học sinh</th><th>Lớp</th><th>Hình thức</th><th>Chi phí phát sinh</th><th>Phải thu</th><th>Đã thu tháng này</th><th>Còn lại</th><th>Trạng thái</th><th></th></tr>
-  ${data.students.map(st=>{
-    const info=billingInfo(st,monthKey);
-    const paid=info.mode==="monthly"
-      ? Number(st.fee?.monthly_paid?.[monthKey]??0)||0
-      : Number(st.fee?.paid??0)||0;
+  if(!data.students.length){financeTable.innerHTML='<div class="empty">Chưa có học sinh.</div>';return;}
 
-    // For monthly tuition, billingInfo.balance is the running balance after
-    // this month's payment: positive = debt, negative = credit.
-    // For course tuition, paid-total gives the overpayment.
-    let due=0, credit=0, status="", cls="";
+  const groups=[];
+  (data.courses||[]).forEach(c=>{
+    const students=data.students.filter(st=>String(st.course_id)===String(c.id));
+    if(students.length)groups.push({id:c.id,name:c.name||"Chưa đặt tên",students});
+  });
+  const unassigned=data.students.filter(st=>!(data.courses||[]).some(c=>String(c.id)===String(st.course_id)));
+  if(unassigned.length)groups.push({id:"",name:"Chưa xếp khóa học",students:unassigned});
+
+  const renderFeeRow=st=>{
+    const info=billingInfo(st,monthKey);
+    const paid=info.mode==="monthly"?Number(st.fee?.monthly_paid?.[monthKey]??0)||0:Number(st.fee?.paid??0)||0;
+    let due=0,credit=0,status="",cls="";
     if(info.mode==="monthly"){
-      due=Math.max(0,info.balance||0);
-      credit=Math.max(0,-(info.balance||0));
-      if(info.total<=0 && due===0 && credit===0){status="Chưa thiết lập";cls="fee-none";}
+      due=Math.max(0,info.balance||0); credit=Math.max(0,-(info.balance||0));
+      if(info.total<=0&&due===0&&credit===0){status="Chưa thiết lập";cls="fee-none";}
       else if(credit>0){status="Đã nộp dư";cls="fee-paid";}
-      else if(due>0 && paid<=0){status="Chưa nộp";cls="fee-unpaid";}
+      else if(due>0&&paid<=0){status="Chưa nộp";cls="fee-unpaid";}
       else if(due>0){status="Đã nộp một phần";cls="fee-partial";}
-      else {status="Đã thanh toán";cls="fee-paid";}
+      else{status="Đã thanh toán";cls="fee-paid";}
     }else{
-      due=Math.max(0,info.total-paid);
-      credit=Math.max(0,paid-info.total);
+      due=Math.max(0,info.total-paid); credit=Math.max(0,paid-info.total);
       if(info.total<=0){status="Chưa thiết lập";cls="fee-none";}
       else if(credit>0){status="Đã nộp dư";cls="fee-paid";}
-      else if(due>0 && paid<=0){status="Chưa nộp";cls="fee-unpaid";}
+      else if(due>0&&paid<=0){status="Chưa nộp";cls="fee-unpaid";}
       else if(due>0){status="Đã nộp một phần";cls="fee-partial";}
-      else {status="Đã thanh toán";cls="fee-paid";}
+      else{status="Đã thanh toán";cls="fee-paid";}
     }
-
     const className=getClassForStudent(st)?.name||st.class||"";
-    const modeText=info.mode==="monthly"
-      ? `Theo tháng<br><small>${info.sessions} buổi × ${info.price.toLocaleString("vi-VN")}đ${info.arrears>0?`<br><span style="color:#c43d3d">Nợ cũ: ${info.arrears.toLocaleString("vi-VN")}đ</span>`:""}${info.creditBefore>0?`<br><span style="color:#21866e">Dư cũ: ${info.creditBefore.toLocaleString("vi-VN")}đ</span>`:""}</small>`
-      : `Theo khóa${st.fee?.course_start_date||st.fee?.course_end_date||st.fee?.course_sessions?`<br><small>${st.fee?.course_start_date?`Từ ${new Date(st.fee.course_start_date+"T00:00:00").toLocaleDateString("vi-VN")}`:""}${st.fee?.course_end_date?` đến ${new Date(st.fee.course_end_date+"T00:00:00").toLocaleDateString("vi-VN")}`:""}${st.fee?.course_sessions?`<br>${Number(st.fee.course_sessions).toLocaleString("vi-VN")} buổi`:""}</small>`:""}`;
+    const modeText=info.mode==="monthly"?`Theo tháng<br><small>${info.sessions} buổi × ${info.price.toLocaleString("vi-VN")}đ${info.arrears>0?`<br><span style="color:#c43d3d">Nợ cũ: ${info.arrears.toLocaleString("vi-VN")}đ</span>`:""}${info.creditBefore>0?`<br><span style="color:#21866e">Dư cũ: ${info.creditBefore.toLocaleString("vi-VN")}đ</span>`:""}</small>`:`Theo khóa${st.fee?.course_start_date||st.fee?.course_end_date||st.fee?.course_sessions?`<br><small>${st.fee?.course_start_date?`Từ ${new Date(st.fee.course_start_date+"T00:00:00").toLocaleDateString("vi-VN")}`:""}${st.fee?.course_end_date?` đến ${new Date(st.fee.course_end_date+"T00:00:00").toLocaleDateString("vi-VN")}`:""}${st.fee?.course_sessions?`<br>${Number(st.fee.course_sessions).toLocaleString("vi-VN")} buổi`:""}</small>`:""}`;
+    const remainingHtml=credit>0?`<span style="color:#21866e;font-weight:800">Dư ${credit.toLocaleString("vi-VN")}đ</span><br><small style="color:#21866e">chuyển sang tháng sau</small>`:`${due.toLocaleString("vi-VN")}đ`;
+    return `<tr><td><b>${esc(st.name)}</b></td><td>${esc(className||st.course||"")}</td><td>${modeText}</td><td>${Number(info.extraTotal||0).toLocaleString("vi-VN")}đ</td><td>${(info.mode==="monthly"?Math.max(0,info.balance||0):info.total).toLocaleString("vi-VN")}đ</td><td>${paid.toLocaleString("vi-VN")}đ</td><td>${remainingHtml}</td><td><span class="fee-status ${cls}">${status}</span></td><td><button type="button" class="btn mini primary" onclick="recordFee('${String(st.id)}')">Ghi nhận</button> <button type="button" class="btn mini outline" onclick="openParentReport('${String(st.id)}')">🧾 Xuất phiếu thu học phí</button></td></tr>`;
+  };
 
-    const remainingHtml=credit>0
-      ? `<span style="color:#21866e;font-weight:800">Dư ${credit.toLocaleString("vi-VN")}đ</span><br><small style="color:#21866e">chuyển sang tháng sau</small>`
-      : `${due.toLocaleString("vi-VN")}đ`;
-
-    return `<tr>
-      <td><b>${esc(st.name)}</b></td>
-      <td>${esc(className||st.course||"")}</td>
-      <td>${modeText}</td>
-      <td>${Number(info.extraTotal||0).toLocaleString("vi-VN")}đ</td>
-      <td>${(info.mode==="monthly"?Math.max(0,info.balance||0):info.total).toLocaleString("vi-VN")}đ</td>
-      <td>${paid.toLocaleString("vi-VN")}đ</td>
-      <td>${remainingHtml}</td>
-      <td><span class="fee-status ${cls}">${status}</span></td>
-      <td><button type="button" class="btn mini primary" onclick="recordFee('${String(st.id)}')">Ghi nhận</button>
-      <button type="button" class="btn mini outline" onclick="openParentReport('${String(st.id)}')">🧾 Xuất phiếu thu học phí</button></td>
-    </tr>`;
-  }).join("")}</table>
-  <p class="hint" style="margin-top:10px">Đang tính học phí ${monthLabel}. Với lớp thu theo tháng, số tiền = số buổi của lớp trong tháng × đơn giá/buổi; không phụ thuộc điểm danh của học sinh. Nộp thiếu sẽ cộng nợ sang tháng sau; nộp dư sẽ chuyển số dư sang tháng sau.</p>`
-  :'<div class="empty">Chưa có học sinh.</div>';
+  financeTable.innerHTML=groups.map((g,i)=>{
+    const gid=`finance-course-group-${i}-${String(g.id).replace(/[^a-zA-Z0-9_-]/g,"")}`;
+    return `<div class="panel" style="margin-bottom:14px;padding:0;border-left:4px solid var(--primary);overflow:hidden">
+      <button type="button" class="course-group-header" data-course-toggle="${gid}" onclick="toggleCourseStudentGroup('${gid}')" style="width:100%;border:0;background:transparent;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;text-align:left">
+        <span style="display:flex;align-items:center;gap:10px"><span class="course-toggle-icon" style="font-size:20px;font-weight:800">＋</span><span><b style="font-size:18px">📚 ${esc(g.name)}</b> <span class="badge ok">${g.students.length} học sinh</span></span></span>
+      </button>
+      <div id="${gid}" style="display:none;padding:0 16px 16px">
+        <table><tr><th>Học sinh</th><th>Lớp</th><th>Hình thức</th><th>Chi phí phát sinh</th><th>Phải thu</th><th>Đã thu tháng này</th><th>Còn lại</th><th>Trạng thái</th><th></th></tr>${g.students.map(renderFeeRow).join("")}</table>
+      </div>
+    </div>`;
+  }).join("")+`<p class="hint" style="margin-top:10px">Đang tính học phí ${monthLabel}. Với lớp thu theo tháng, số tiền = số buổi của lớp trong tháng × đơn giá/buổi; không phụ thuộc điểm danh của học sinh. Nộp thiếu sẽ cộng nợ sang tháng sau; nộp dư sẽ chuyển số dư sang tháng sau.</p>`;
 }
 function renderSchedule(){
   const grouped={};
@@ -1047,10 +1077,11 @@ function renderResources(){
     </tr>`;
   }).join("")}</table>`:'<div class="empty">Chưa có tài liệu.</div>';
 }
-function openStudent(id){
+function openStudent(id, defaultCourseId=""){
  let s=data.students.find(x=>String(x.id)===String(id))||{};
+ const selectedCourse=s.course_id||defaultCourseId||"";
  modalTitle.textContent=id?"Sửa học sinh":"Thêm học sinh";
- modalContent.innerHTML=`<div class="formgrid"><div><label>Họ và tên</label><input id="f_name" value="${esc(s.name)}"></div><div><label>Mã học sinh</label><input id="f_code" value="${esc(s.code)}"></div><div><label>Khóa học</label><select id="f_course"><option value="">-- Chọn khóa học --</option>${data.courses.map(c=>`<option value="${esc(c.id)}" ${String(s.course_id||"")===String(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Ngày sinh</label><input id="f_dob" type="date" value="${s.dob||""}"></div><div><label>Ngày bắt đầu</label><input id="f_start" type="date" value="${s.start||""}"></div><div><label>Trạng thái</label><select id="f_status"><option ${s.status==="Đang học"?"selected":""}>Đang học</option><option ${s.status==="Nghỉ"?"selected":""}>Nghỉ</option><option ${s.status==="Hoàn thành"?"selected":""}>Hoàn thành</option></select></div></div><br><label>Ghi chú</label><textarea id="f_note">${esc(s.note)}</textarea><br><button class="btn primary" onclick="saveStudent(${id?`'${String(id)}'`:0})">Lưu học sinh</button>`;
+ modalContent.innerHTML=`<div class="formgrid"><div><label>Họ và tên</label><input id="f_name" value="${esc(s.name)}"></div><div><label>Mã học sinh</label><input id="f_code" value="${esc(s.code)}"></div><div><label>Khóa học</label><select id="f_course"><option value="">-- Chọn khóa học --</option>${data.courses.map(c=>`<option value="${esc(c.id)}" ${String(selectedCourse)===String(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Ngày sinh</label><input id="f_dob" type="date" value="${s.dob||""}"></div><div><label>Ngày bắt đầu</label><input id="f_start" type="date" value="${s.start||""}"></div><div><label>Trạng thái</label><select id="f_status"><option ${s.status==="Đang học"?"selected":""}>Đang học</option><option ${s.status==="Nghỉ"?"selected":""}>Nghỉ</option><option ${s.status==="Hoàn thành"?"selected":""}>Hoàn thành</option></select></div></div><br><label>Ghi chú</label><textarea id="f_note">${esc(s.note)}</textarea><br><button class="btn primary" onclick="saveStudent(${id?`'${String(id)}'`:0})">Lưu học sinh</button>`;
  modal.classList.add("show")
 }
 async function saveStudent(id){
