@@ -1598,9 +1598,34 @@ function renderAttendanceHistory(){
   const classId=String(data.attendanceClassId||""),rows=[];
   Object.keys(data.attendance||{}).sort().reverse().forEach(d=>{
     const a=data.attendance[d]?.__class;
-    if(a && String(a.class_id)===classId)rows.push(`<tr><td>${d}</td><td>${esc(a.class_name||"")}</td><td>${a.mark==="N"||a.status==="absent"?"Nghỉ":"Học"}</td><td>${esc(a.note||"")}</td></tr>`);
+    if(a && String(a.class_id)===classId){
+      rows.push(`<tr><td>${d}</td><td>${esc(a.class_name||"")}</td><td>${a.mark==="N"||a.status==="absent"?"Nghỉ":"Học"}</td><td>${esc(a.note||"")}</td><td><button type="button" class="btn mini outline" onclick="editAttendanceClass('${d}')">Sửa</button> <button type="button" class="btn mini danger" onclick="delAttendanceClass('${d}')">Xóa</button></td></tr>`);
+    }
   });
-  box.innerHTML=rows.length?`<table><tr><th>Ngày</th><th>Lớp</th><th>Trạng thái</th><th>Ghi chú</th></tr>${rows.join("")}</table>`:'<div class="empty">Chưa có lịch sử điểm danh lớp.</div>';
+  box.innerHTML=rows.length?`<table><tr><th>Ngày</th><th>Lớp</th><th>Trạng thái</th><th>Ghi chú</th><th></th></tr>${rows.join("")}</table>`:'<div class="empty">Chưa có lịch sử điểm danh lớp.</div>';
+}
+function editAttendanceClass(date){
+  const rec=data.attendance?.[date]?.__class;
+  if(!rec)return alert("Không tìm thấy bản ghi điểm danh.");
+  data.attendanceDate=date;
+  data.attendanceClassId=rec.class_id;
+  renderAttendance();
+  window.scrollTo({top:document.getElementById("attendance")?.offsetTop||0,behavior:"smooth"});
+}
+function delAttendanceClass(date){
+  const rec=data.attendance?.[date]?.__class;
+  if(!rec)return alert("Không tìm thấy bản ghi điểm danh.");
+  if(!confirm(`Xóa điểm danh lớp ${rec.class_name||""} ngày ${date}?`))return;
+  try{
+    if(data.attendance?.[date])delete data.attendance[date].__class;
+    if(data.attendance?.[date] && Object.keys(data.attendance[date]).length===0)delete data.attendance[date];
+    persist();
+    renderAttendance();
+    alert("Đã xóa điểm danh lớp.");
+  }catch(err){
+    console.error("delAttendanceClass",err);
+    alert("Không xóa được điểm danh.\n\n"+(err?.message||err));
+  }
 }
 
 function openCriterion(id){
