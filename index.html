@@ -671,6 +671,27 @@ function renderStudents(){
 function renderCourses(){
   courseTable.innerHTML=data.courses.length?`<table><tr><th>Khóa học</th><th>Giáo viên</th><th>Học phí</th><th>Số học sinh</th><th></th></tr>${data.courses.map(c=>`<tr><td><b>${esc(c.name)}</b><br><small>${esc(c.desc)}</small></td><td>${esc(c.teacher)}</td><td>${(+c.fee||0).toLocaleString("vi-VN")}đ</td><td>${data.students.filter(s=>String(s.course_id)===String(c.id)).length}</td><td><button type="button" class="btn mini outline" onclick="openCourse('${String(c.id)}')">Sửa</button> <button type="button" class="btn mini danger" onclick="delCourse('${String(c.id)}')">Xóa</button></td></tr>`).join("")}</table>`:'<div class="empty">Chưa có khóa học.</div>';
 }
+async function delCourse(id){
+  if(!confirm("Xóa khóa học này?"))return;
+  const cid=String(id);
+  const students=data.students.filter(s=>String(s.course_id)===cid);
+  if(students.length){
+    return alert("Không thể xóa khóa học vì đang có "+students.length+" học sinh thuộc khóa học này. Hãy chuyển học sinh sang khóa học khác trước.");
+  }
+  if(!supabaseClient)return alert("Chưa kết nối Supabase. Không thể xóa khóa học.");
+  try{
+    const {error}=await supabaseClient.from("courses").delete().eq("id",id);
+    if(error)throw error;
+    data.courses=data.courses.filter(c=>String(c.id)!==cid);
+    data.schedules=(data.schedules||[]).filter(s=>String(s.course_id||"")!==cid);
+    saveLocal();
+    renderAll();
+    alert("Đã xóa khóa học.");
+  }catch(err){
+    console.error("delCourse",err);
+    alert("Không xóa được khóa học.\n\n"+(err?.message||err));
+  }
+}
 function fillStudents(){}
 function renderAtt(){if(typeof renderAttendance==="function")renderAttendance();}
 
