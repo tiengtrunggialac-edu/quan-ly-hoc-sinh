@@ -492,7 +492,7 @@ function scoreAvg(s){let arr=[];data.criteria.forEach(c=>(s.scores?.[c.id]||[]).
 function att(s){return s.attendance?.total?Math.round(s.attendance.present/s.attendance.total*100):null}
 function badge(x){if(x==null)return '<span class="badge ok">Chưa có dữ liệu</span>';return x>=8?'<span class="badge good">Tốt</span>':x>=6.5?'<span class="badge ok">Khá</span>':x>=5?'<span class="badge warn">Trung bình</span>':'<span class="badge bad">Cần cải thiện</span>'}
 function show(id,btn){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id)?.classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");renderAll()}
-function navRender(){mainNav.innerHTML="";manageNav.innerHTML="";data.nav.forEach(n=>{let b=document.createElement("button");b.innerHTML=`${n.icon} &nbsp;${esc(n.label)}`;b.onclick=()=>show(n.id,b);(n.group==="main"?mainNav:manageNav).appendChild(b)})}
+function navRender(){mainNav.innerHTML="";manageNav.innerHTML="";data.nav=(Array.isArray(data.nav)?data.nav:[]).filter(n=>String(n?.id||"").toLowerCase()!=="evaluation"&&!/đánh giá/i.test(String(n?.label||"")));data.nav.forEach(n=>{let b=document.createElement("button");b.innerHTML=`${n.icon} &nbsp;${esc(n.label)}`;b.onclick=()=>show(n.id,b);(n.group==="main"?mainNav:manageNav).appendChild(b)})}
 function renderHome(){
  let av=data.students.map(scoreAvg).filter(x=>x!=null), aa=data.students.map(att).filter(x=>x!=null);
  stat1.textContent=data.students.length;stat2.textContent=data.students.filter(s=>s.status==="Đang học").length;
@@ -2569,7 +2569,7 @@ function saveFee(id){
   closeModal();
   persist();
 }
-function quickAction(a){if(action==="teacherRemarks"){show("teacherRemarks");return;} if(a==="student")openStudent();else if(a==="course")openCourse();else if(a==="attendance")show("attendance");else if(a==="score")openScore();else if(a==="finance")show("finance");else if(a==="evaluation")show("evaluation")}
+function quickAction(a){if(action==="teacherRemarks"){show("teacherRemarks");return;} if(a==="student")openStudent();else if(a==="course")openCourse();else if(a==="attendance")show("attendance");else if(a==="score")openScore();else if(a==="finance")show("finance");}
 function settingsTab(tab,btn){
   document.querySelectorAll("#settings .tabs button").forEach(b=>b.classList.remove("active"));
   if(btn)btn.classList.add("active");
@@ -2642,7 +2642,7 @@ function saveStatsSettings(){
   alert("Đã lưu thay đổi thẻ thống kê.");
 }
 function saveNavSettings(){
-  data.nav=Array.isArray(data.nav)?data.nav:[];
+  data.nav=(Array.isArray(data.nav)?data.nav:[]).filter(n=>String(n?.id||"").toLowerCase()!=="evaluation"&&!/đánh giá/i.test(String(n?.label||"")));
   data.nav.forEach((x,i)=>{
     x.label=document.getElementById("set_nav_label_"+i).value.trim();
     x.icon=document.getElementById("set_nav_icon_"+i).value.trim();
