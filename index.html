@@ -451,6 +451,19 @@ function persist(){localStorage.setItem("gialac_manager",JSON.stringify(data));r
 function saveLocal(){localStorage.setItem("gialac_manager",JSON.stringify(data))}
 async function loadSupabaseData(){
  try{
+  // Giữ lại dữ liệu điểm danh đang lưu trên máy trước khi tải danh sách
+  // học sinh từ Supabase. Trước đây đoạn này vô tình ghi đè attendance
+  // bằng attendance:{present:0,total:0} nên reload trang là mất điểm danh.
+  const localAttendance = (data && data.attendance && typeof data.attendance === "object")
+    ? JSON.parse(JSON.stringify(data.attendance)) : {};
+  const localAttendanceMeta = (data && data.attendanceSheetMetaByMonth && typeof data.attendanceSheetMetaByMonth === "object")
+    ? JSON.parse(JSON.stringify(data.attendanceSheetMetaByMonth)) : {};
+  const localAttendanceSessions = (data && data.attendanceSheetSessions && typeof data.attendanceSheetSessions === "object")
+    ? JSON.parse(JSON.stringify(data.attendanceSheetSessions)) : {};
+  const localAttendanceMonth = data?.attendanceMonth || "";
+  const localAttendanceDate = data?.attendanceDate || "";
+  const localAttendanceClassId = data?.attendanceClassId || "";
+
   const [{data:courses,error:ce},{data:students,error:se}]=await Promise.all([
    supabaseClient.from("courses").select("id,name,teacher,fee").order("name"),
    supabaseClient.from("students").select("id,name,student_code,course_id,date_of_birth,start_date,status").order("name")
@@ -470,6 +483,15 @@ async function loadSupabaseData(){
    course:courseMap.get(s.course_id)?.name||"",dob:s.date_of_birth||"",start:s.start_date||"",
    status:s.status||"Đang học",note:"",scores:{},attendance:{present:0,total:0},fee:{paid:0}
   }));
+
+  // KHÔNG ghi đè attendance đã lưu local khi Supabase tải lại học sinh.
+  data.attendance = localAttendance;
+  data.attendanceSheetMetaByMonth = localAttendanceMeta;
+  data.attendanceSheetSessions = localAttendanceSessions;
+  if(localAttendanceMonth) data.attendanceMonth = localAttendanceMonth;
+  if(localAttendanceDate) data.attendanceDate = localAttendanceDate;
+  if(localAttendanceClassId) data.attendanceClassId = localAttendanceClassId;
+
   saveLocal();
   renderAll();
 try{settingsTab("center",document.querySelector("#settings .tabs button"));}catch(e){console.warn(e)}
@@ -1740,7 +1762,7 @@ function renderAttendance(){
   <br><button type="button" class="btn primary" onclick="saveAttendanceClass()">💾 Lưu điểm danh lớp</button>`;
   renderAttendanceHistory();
 }
-function saveAttendanceClass(){
+async function saveAttendanceClass(){
   const date=data.attendanceDate||new Date().toISOString().slice(0,10),classId=data.attendanceClassId;
   if(!classId)return alert("Vui lòng chọn lớp.");
   const cls=getAttendanceClasses().find(c=>String(c.id)===String(classId));
@@ -1749,7 +1771,9 @@ function saveAttendanceClass(){
   const status=r?.value||"present",note=document.getElementById("att_class_note")?.value||"";
   data.attendance=data.attendance||{};data.attendance[date]=data.attendance[date]||{};
   data.attendance[date].__class={class_id:classId,class_name:cls.name,status,note,source:"manual",mark:status==="present"?"H":"N"};
-  persist();renderAttendance();alert(`Đã lưu điểm danh lớp ${cls.name} — ${status==="present"?"HỌC":"NGHỈ"}.`);
+  saveLocal();
+  renderAttendance();
+  alert(`Đã lưu điểm danh lớp ${cls.name} — ${status==="present"?"HỌC":"NGHỈ"}.`);
 }
 function renderAttendanceHistory(){
   const box=document.getElementById("attTable");if(!box)return;
