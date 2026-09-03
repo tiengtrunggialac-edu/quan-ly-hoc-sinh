@@ -473,16 +473,30 @@ async function loadSupabaseData(){
   const courseRows=Array.isArray(courses)?courses:[];
   const studentRows=Array.isArray(students)?students:[];
   const courseMap=new Map(courseRows.map(c=>[c.id,c]));
+  // Giữ các thông tin cục bộ mà bảng Supabase students chưa có, đặc biệt class_id
+  // để liên kết Học sinh → Lớp → Điểm danh → Học phí không bị đứt sau khi tải lại.
+  const localStudentsById=new Map((Array.isArray(data.students)?data.students:[]).map(st=>[String(st.id),st]));
   const localCourses=Array.isArray(data.courses)?data.courses:[];
   data.courses=courseRows.map(c=>{
     const lc=localCourses.find(x=>String(x.id)===String(c.id))||{};
     return {id:c.id,name:c.name||"",teacher:c.teacher||"",fee:Number(c.fee)||0,desc:lc.desc||"",fee_mode:lc.fee_mode||"course",fee_per_session:Number(lc.fee_per_session??0)||0,course_start_date:lc.course_start_date||"",course_end_date:lc.course_end_date||"",course_sessions:Number(lc.course_sessions??0)||0};
   });
-  data.students=studentRows.map(s=>({
-   id:s.id,name:s.name||"",code:s.student_code||"",course_id:s.course_id||null,
-   course:courseMap.get(s.course_id)?.name||"",dob:s.date_of_birth||"",start:s.start_date||"",
-   status:s.status||"Đang học",note:"",scores:{},attendance:{present:0,total:0},fee:{paid:0}
-  }));
+  data.students=studentRows.map(s=>{
+   const old=localStudentsById.get(String(s.id))||{};
+   return {
+    ...old,
+    id:s.id,name:s.name||old.name||"",code:s.student_code||old.code||"",course_id:s.course_id||old.course_id||null,
+    course:courseMap.get(s.course_id)?.name||old.course||"",dob:s.date_of_birth||old.dob||"",start:s.start_date||old.start||"",
+    status:s.status||old.status||"Đang học",
+    // Không làm mất lớp đã gán cục bộ nếu Supabase chưa lưu class_id.
+    class_id:s.class_id||old.class_id||null,
+    class:old.class||"",
+    note:old.note||"",
+    scores:old.scores&&typeof old.scores==="object"?old.scores:{},
+    attendance:old.attendance&&typeof old.attendance==="object"?old.attendance:{present:0,total:0},
+    fee:old.fee&&typeof old.fee==="object"?old.fee:{paid:0}
+   };
+  });
 
   // KHÔNG ghi đè attendance đã lưu local khi Supabase tải lại học sinh.
   data.attendance = localAttendance;
@@ -1772,7 +1786,10 @@ async function saveAttendanceClass(){
   data.attendance=data.attendance||{};data.attendance[date]=data.attendance[date]||{};
   data.attendance[date].__class={class_id:classId,class_name:cls.name,status,note,source:"manual",mark:status==="present"?"H":"N"};
   saveLocal();
+  // Điểm danh lớp là nguồn trực tiếp để tính số buổi học phí tháng.
+  // Render lại cả Học phí ngay sau khi lưu để số buổi và tiền phải thu cập nhật tức thì.
   renderAttendance();
+  renderFinance();
   alert(`Đã lưu điểm danh lớp ${cls.name} — ${status==="present"?"HỌC":"NGHỈ"}.`);
 }
 function renderAttendanceHistory(){
@@ -1803,6 +1820,7 @@ function delAttendanceClass(date){
     if(data.attendance?.[date] && Object.keys(data.attendance[date]).length===0)delete data.attendance[date];
     persist();
     renderAttendance();
+    renderFinance();
     alert("Đã xóa điểm danh lớp.");
   }catch(err){
     console.error("delAttendanceClass",err);
