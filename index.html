@@ -1276,7 +1276,7 @@ function renderScoreSheetLinks(){
   box.innerHTML=list.map((x,i)=>`<div class="panel" style="margin:8px 0;padding:14px;border-left:4px solid var(--primary)">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div style="flex:1;min-width:220px"><b style="font-size:17px">📚 ${esc(x.className||"Chưa đặt tên lớp")}</b><div class="hint" style="margin-top:4px;word-break:break-all">${esc(x.url||"")}</div></div>
-      <button type="button" class="btn primary mini" onclick="window.open(${JSON.stringify(x.url||"")},'_blank','noopener,noreferrer')">🔗 Mở bảng</button>
+      <a class="btn primary mini" href="${esc(x.url||"")}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">🔗 Mở bảng</a>
       <button type="button" class="btn outline mini" onclick="editScoreSheetLink('${String(x.id)}')">✏️ Sửa</button>
       <button type="button" class="btn danger mini" onclick="deleteScoreSheetLink('${String(x.id)}')">🗑️ Xóa</button>
     </div>
